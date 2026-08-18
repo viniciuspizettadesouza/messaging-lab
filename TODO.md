@@ -49,15 +49,15 @@
 
 ## 6. Benchmark engine
 
-- [ ] Generate isolated resource names and deterministic payloads for each run.
-- [ ] Implement warm-up, timed publishing, consumption tracking, and bounded latency sampling.
-- [ ] Calculate elapsed time, throughput, p50/p95/p99 latency, counts, loss, duplicates, and errors.
-- [ ] Enforce a single active run and return a conflict when another run is requested.
-- [ ] Implement timeout, cancellation, failure handling, and cleanup in all terminal paths.
-- [ ] Persist aggregate results and capability notes in SQLite.
-- [ ] Implement `POST /api/runs` and `POST /api/runs/:id/cancel`.
-- [ ] Implement the SSE event stream at `GET /api/runs/:id/events`.
-- [ ] Add unit tests for metrics and lifecycle behavior and integration tests for complete runs.
+- [x] Generate isolated resource names and deterministic payloads for each run.
+- [x] Implement warm-up, timed publishing, consumption tracking, and bounded latency sampling.
+- [x] Calculate elapsed time, throughput, p50/p95/p99 latency, counts, loss, duplicates, and errors.
+- [x] Enforce a single active run and return a conflict when another run is requested.
+- [x] Implement timeout, cancellation, failure handling, and cleanup in all terminal paths.
+- [x] Persist aggregate results and capability notes in SQLite.
+- [x] Implement `POST /api/runs` and `POST /api/runs/:id/cancel`.
+- [x] Implement the SSE event stream at `GET /api/runs/:id/events`.
+- [x] Add unit tests for metrics and lifecycle behavior and integration tests for complete runs.
 
 ## 7. Dashboard
 

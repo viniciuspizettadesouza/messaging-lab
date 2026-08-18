@@ -22,7 +22,7 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
-    "test:integration": "RUN_BROKER_INTEGRATION=1 vitest run apps/api/src/adapters/adapters.integration.test.ts",
+    "test:integration": "RUN_BROKER_INTEGRATION=1 vitest run apps/api/src/adapters/adapters.integration.test.ts apps/api/src/benchmark/benchmark-engine.integration.test.ts",
     "test:watch": "vitest",
     "docker:config": "node scripts/compose.mjs config",
     "docker:up": "node scripts/compose.mjs up --build",

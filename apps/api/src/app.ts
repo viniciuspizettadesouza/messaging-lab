@@ -4,11 +4,13 @@ import {
   BROKER_CAPABILITIES,
   BROKER_IDS,
   brokersResponseSchema,
+  cancelRunResponseSchema,
   errorResponseSchema,
   runIdParamsSchema,
   runResponseSchema,
   runsQuerySchema,
   runsResponseSchema,
+  startRunRequestSchema,
   type BrokerHealth,
   type BrokerId,
 } from '@messaging-lab/shared';
@@ -16,6 +18,11 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { ZodError } from 'zod';
 
 import { createBrokerAdapters } from './adapters/index.js';
+import { RunEventStore, formatSseEvent } from './benchmark/run-events.js';
+import {
+  RunManager,
+  type BrokerAdapterRegistry,
+} from './benchmark/run-manager.js';
 import { loadConfig, type ApiConfig } from './config.js';
 import { openDatabase } from './database.js';
 import { ApiError } from './errors.js';
@@ -24,11 +31,14 @@ import { RunRepository } from './run-repository.js';
 export interface Application {
   readonly app: FastifyInstance;
   readonly repository: RunRepository;
+  readonly runManager: RunManager;
+  readonly events: RunEventStore;
 }
 
 export interface ApplicationOptions {
   readonly config?: ApiConfig;
   readonly database?: DatabaseSync;
+  readonly brokerAdapters?: BrokerAdapterRegistry;
   readonly brokerHealthChecker?: (broker: BrokerId) => Promise<BrokerHealth>;
   readonly logger?: boolean;
 }
@@ -42,7 +52,9 @@ export function createApplication(
   const app = Fastify({
     logger: options.logger ?? config.nodeEnv !== 'test',
   });
-  const adapters = createBrokerAdapters(config);
+  const adapters = options.brokerAdapters ?? createBrokerAdapters(config);
+  const events = new RunEventStore();
+  const runManager = new RunManager(repository, adapters, events);
   const brokerHealthChecker =
     options.brokerHealthChecker ??
     (async (broker: BrokerId) => adapters[broker].checkHealth());
@@ -157,11 +169,71 @@ export function createApplication(
     return runResponseSchema.parse(run);
   });
 
+  app.post('/api/runs', async (request, reply) => {
+    const configuration = startRunRequestSchema.parse(request.body);
+    const run = runManager.start(configuration);
+    return reply.status(202).send(runResponseSchema.parse(run));
+  });
+
+  app.post('/api/runs/:id/cancel', async (request, reply) => {
+    const { id } = runIdParamsSchema.parse(request.params);
+    runManager.cancel(id);
+    return reply.status(202).send(
+      cancelRunResponseSchema.parse({
+        runId: id,
+        cancellationRequested: true,
+      }),
+    );
+  });
+
+  app.get('/api/runs/:id/events', async (request, reply) => {
+    const { id } = runIdParamsSchema.parse(request.params);
+    if (!repository.getById(id)) {
+      throw new ApiError(404, 'RUN_NOT_FOUND', `Run ${id} was not found.`);
+    }
+
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-cache, no-transform',
+      connection: 'keep-alive',
+    });
+    reply.raw.flushHeaders();
+
+    const history = events.history(id);
+    for (const event of history) reply.raw.write(formatSseEvent(event));
+    if (
+      history.some(
+        (event) => event.type === 'status' && isTerminal(event.status),
+      )
+    ) {
+      reply.raw.end();
+      return;
+    }
+
+    let unsubscribe: () => void = () => undefined;
+    const heartbeat = setInterval(
+      () => reply.raw.write(': heartbeat\n\n'),
+      15_000,
+    );
+    const close = () => {
+      clearInterval(heartbeat);
+      unsubscribe();
+      if (!reply.raw.writableEnded) reply.raw.end();
+    };
+    unsubscribe = events.subscribe(id, (event) => {
+      reply.raw.write(formatSseEvent(event));
+      if (event.type === 'status' && isTerminal(event.status)) close();
+    });
+    request.raw.once('close', close);
+  });
+
   app.addHook('onClose', async () => {
+    await runManager.shutdown();
     database.close();
   });
 
-  return { app, repository };
+  return { app, repository, runManager, events };
 }
 
 function getClientErrorStatus(error: unknown): number | null {
@@ -169,4 +241,8 @@ function getClientErrorStatus(error: unknown): number | null {
   return typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500
     ? statusCode
     : null;
+}
+
+function isTerminal(status: string): boolean {
+  return ['completed', 'failed', 'timed-out', 'cancelled'].includes(status);
 }

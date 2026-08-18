@@ -3,12 +3,15 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   BENCHMARK_DEFAULTS,
   brokersResponseSchema,
+  cancelRunResponseSchema,
   errorResponseSchema,
+  runEventSchema,
   runResponseSchema,
   runsResponseSchema,
 } from '@messaging-lab/shared';
 
 import { createApplication, type Application } from './app.js';
+import { ImmediateAdapter } from './benchmark/fake-adapter.test-helper.js';
 import type { ApiConfig } from './config.js';
 import { openDatabase } from './database.js';
 
@@ -27,10 +30,16 @@ describe('API', () => {
   let application: Application;
 
   beforeEach(() => {
+    const adapter = new ImmediateAdapter();
     application = createApplication({
       config,
       database: openDatabase(':memory:'),
       logger: false,
+      brokerAdapters: {
+        redis: adapter,
+        kafka: adapter,
+        rabbitmq: adapter,
+      },
       brokerHealthChecker: async (broker) => ({
         status: broker === 'redis' ? 'unhealthy' : 'healthy',
         latencyMs: broker === 'redis' ? null : 1,
@@ -122,4 +131,116 @@ describe('API', () => {
       error: { code: 'NOT_FOUND' },
     });
   });
+
+  it('starts a run and streams its lifecycle and metrics over SSE', async () => {
+    const startResponse = await application.app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      payload: {
+        broker: 'redis',
+        scenario: 'fan-out',
+        messageCount: 2,
+        payloadSizeBytes: 16,
+        consumerCount: 2,
+      },
+    });
+
+    expect(startResponse.statusCode).toBe(202);
+    const started = runResponseSchema.parse(startResponse.json());
+    const completed = await waitForCompletedRun(application, started.id);
+    expect(completed.metrics).toMatchObject({
+      publishedMessages: 2,
+      receivedMessages: 4,
+    });
+
+    const eventResponse = await application.app.inject({
+      method: 'GET',
+      url: `/api/runs/${started.id}/events`,
+    });
+    const events = eventResponse.body
+      .split('\n')
+      .filter((line) => line.startsWith('data: '))
+      .map((line) => runEventSchema.parse(JSON.parse(line.slice(6))));
+
+    expect(eventResponse.statusCode).toBe(200);
+    expect(eventResponse.headers['content-type']).toContain(
+      'text/event-stream',
+    );
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'progress' }),
+        expect.objectContaining({ type: 'metrics' }),
+        expect.objectContaining({ type: 'status', status: 'completed' }),
+      ]),
+    );
+  });
+
+  it('cancels the active run through the API', async () => {
+    await application.app.close();
+    const adapter = new NeverDeliverAdapter();
+    application = createApplication({
+      config,
+      database: openDatabase(':memory:'),
+      logger: false,
+      brokerAdapters: {
+        redis: adapter,
+        kafka: adapter,
+        rabbitmq: adapter,
+      },
+    });
+    const startResponse = await application.app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      payload: { broker: 'redis', scenario: 'fan-out', timeoutMs: 2_000 },
+    });
+    const started = runResponseSchema.parse(startResponse.json());
+    await waitForRunStatus(application, started.id, 'running');
+
+    const cancelResponse = await application.app.inject({
+      method: 'POST',
+      url: `/api/runs/${started.id}/cancel`,
+    });
+
+    expect(cancelResponse.statusCode).toBe(202);
+    expect(cancelRunResponseSchema.parse(cancelResponse.json())).toEqual({
+      runId: started.id,
+      cancellationRequested: true,
+    });
+    await waitForRunStatus(application, started.id, 'cancelled');
+    expect(adapter.cleaned).toBe(true);
+  });
 });
+
+async function waitForCompletedRun(application: Application, runId: string) {
+  return waitForRunStatus(application, runId, 'completed');
+}
+
+async function waitForRunStatus(
+  application: Application,
+  runId: string,
+  status: string,
+) {
+  const deadline = Date.now() + 2_000;
+
+  while (Date.now() < deadline) {
+    const run = application.repository.requireById(runId);
+    if (run.status === status) return run;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+
+  throw new Error(`Timed out waiting for the run to become ${status}.`);
+}
+
+class NeverDeliverAdapter extends ImmediateAdapter {
+  public override async createRun() {
+    return {
+      resourceNames: ['never-deliver'],
+      startConsumers: async () => undefined,
+      publish: async () => undefined,
+      cleanup: async () => {
+        this.cleaned = true;
+        return { attemptedResources: 1, removedResources: 1, failures: [] };
+      },
+    };
+  }
+}
