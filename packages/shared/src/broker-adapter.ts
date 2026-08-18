@@ -1,0 +1,50 @@
+import type { BrokerHealth } from './api.js';
+import type { BrokerCapabilities, BrokerId, ScenarioId } from './domain.js';
+
+export interface OutboundMessage {
+  readonly id: string;
+  readonly payload: Uint8Array;
+  readonly publishedAtNanoseconds: bigint;
+}
+
+export interface BrokerDelivery extends OutboundMessage {
+  readonly consumerId: string;
+}
+
+export type DeliveryHandler = (
+  delivery: BrokerDelivery,
+) => void | Promise<void>;
+
+export interface BrokerRunContext {
+  readonly runId: string;
+  readonly scenario: ScenarioId;
+  readonly consumerCount: number;
+  readonly signal: AbortSignal;
+}
+
+export interface CleanupFailure {
+  readonly resource: string;
+  readonly message: string;
+}
+
+export interface CleanupReport {
+  readonly attemptedResources: number;
+  readonly removedResources: number;
+  readonly failures: readonly CleanupFailure[];
+}
+
+/** Cleanup must be safe to call more than once, including after partial setup. */
+export interface BrokerRunResource {
+  readonly resourceNames: readonly string[];
+  startConsumers(onDelivery: DeliveryHandler): Promise<void>;
+  publish(message: OutboundMessage): Promise<void>;
+  replay?(onDelivery: DeliveryHandler): Promise<void>;
+  cleanup(): Promise<CleanupReport>;
+}
+
+export interface BrokerAdapter {
+  readonly id: BrokerId;
+  readonly capabilities: BrokerCapabilities;
+  checkHealth(signal?: AbortSignal): Promise<BrokerHealth>;
+  createRun(context: BrokerRunContext): Promise<BrokerRunResource>;
+}

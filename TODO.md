@@ -18,11 +18,11 @@
 
 ## 3. Shared domain contracts
 
-- [ ] Define broker identifiers, scenario identifiers, run statuses, capability flags, and metric types.
-- [ ] Define Zod schemas for starting a run and for all API responses and SSE events.
-- [ ] Define the common broker-adapter interface and resource-cleanup contract.
-- [ ] Define safe defaults and validation limits for message count, payload size, concurrency, consumers, and timeout.
-- [ ] Add unit tests for schemas and validation boundaries.
+- [x] Define broker identifiers, scenario identifiers, run statuses, capability flags, and metric types.
+- [x] Define Zod schemas for starting a run and for all API responses and SSE events.
+- [x] Define the common broker-adapter interface and resource-cleanup contract.
+- [x] Define safe defaults and validation limits for message count, payload size, concurrency, consumers, and timeout.
+- [x] Add unit tests for schemas and validation boundaries.
 
 ## 4. API foundation and persistence
 
