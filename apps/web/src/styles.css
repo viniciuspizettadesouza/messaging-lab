@@ -451,6 +451,7 @@ label small {
   background: #e3e0d9;
 }
 .primary-button,
+.secondary-button,
 .danger-button {
   border: 0;
   border-radius: 8px;
@@ -458,7 +459,6 @@ label small {
 }
 .primary-button {
   width: 100%;
-  margin-top: 22px;
   padding: 13px;
   color: white;
   background: var(--green-dark);
@@ -473,6 +473,72 @@ label small {
 .primary-button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+.experiment-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 22px;
+}
+.secondary-button {
+  width: 100%;
+  padding: 12px;
+  color: var(--green-dark);
+  background: #e7efe8;
+  border: 1px solid #bfd1c5;
+}
+.secondary-button:hover {
+  background: #dce9df;
+}
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.secondary-button span {
+  margin-right: 7px;
+}
+.suite-hint {
+  margin: 10px 2px 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.batch-status {
+  margin-top: 20px;
+  padding: 13px;
+  color: var(--green-dark);
+  background: #edf4ec;
+  border-radius: 9px;
+}
+.batch-status > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+}
+.batch-status span {
+  color: var(--muted);
+  font:
+    9px ui-monospace,
+    'SFMono-Regular',
+    monospace;
+}
+.batch-stopped {
+  color: #7e423e;
+  background: #f6e5e1;
+}
+.batch-track {
+  height: 5px;
+  margin-top: 10px;
+  overflow: hidden;
+  background: rgb(16 84 64 / 12%);
+  border-radius: 9px;
+}
+.batch-track span {
+  display: block;
+  height: 100%;
+  background: var(--green);
+  transition: width 0.2s;
 }
 .form-error {
   color: var(--red);
@@ -954,6 +1020,9 @@ footer p {
   }
   .hero h1 {
     font-size: 40px;
+  }
+  .experiment-actions {
+    grid-template-columns: 1fr;
   }
 }
 @media (prefers-reduced-motion: reduce) {

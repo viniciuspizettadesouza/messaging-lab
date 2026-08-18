@@ -14,12 +14,26 @@ import {
 
 import { BROKER_LABELS, SCENARIO_LABELS } from '../format.js';
 
-interface ExperimentFormProps {
-  readonly disabled: boolean;
-  readonly onStart: (request: StartRunRequest) => Promise<void>;
+export interface BatchProgress {
+  readonly completed: number;
+  readonly current: number;
+  readonly total: number;
+  readonly status: 'running' | 'completed' | 'stopped';
 }
 
-export function ExperimentForm({ disabled, onStart }: ExperimentFormProps) {
+interface ExperimentFormProps {
+  readonly disabled: boolean;
+  readonly batchProgress: BatchProgress | null;
+  readonly onStart: (request: StartRunRequest) => Promise<void>;
+  readonly onRunAll: (request: StartRunRequest) => Promise<void>;
+}
+
+export function ExperimentForm({
+  disabled,
+  batchProgress,
+  onStart,
+  onRunAll,
+}: ExperimentFormProps) {
   const [broker, setBroker] = useState<BrokerId>('redis');
   const [scenario, setScenario] = useState<ScenarioId>('fan-out');
   const [messageCount, setMessageCount] = useState<number>(
@@ -45,6 +59,16 @@ export function ExperimentForm({ disabled, onStart }: ExperimentFormProps) {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const request = validatedRequest();
+    if (request) await onStart(request);
+  }
+
+  async function runAll(): Promise<void> {
+    const request = validatedRequest();
+    if (request) await onRunAll(request);
+  }
+
+  function validatedRequest(): StartRunRequest | null {
     const parsed = startRunRequestSchema.safeParse({
       broker,
       scenario,
@@ -58,10 +82,10 @@ export function ExperimentForm({ disabled, onStart }: ExperimentFormProps) {
       setValidationError(
         parsed.error.issues[0]?.message ?? 'Check the experiment values.',
       );
-      return;
+      return null;
     }
     setValidationError(null);
-    await onStart(parsed.data);
+    return parsed.data;
   }
 
   return (
@@ -170,12 +194,55 @@ export function ExperimentForm({ disabled, onStart }: ExperimentFormProps) {
             {validationError}
           </p>
         ) : null}
-        <button className="primary-button" type="submit" disabled={disabled}>
-          <span aria-hidden="true">▶</span>
-          {disabled ? 'Experiment running' : 'Start experiment'}
-        </button>
+        {batchProgress ? <BatchStatus progress={batchProgress} /> : null}
+        <div className="experiment-actions">
+          <button className="primary-button" type="submit" disabled={disabled}>
+            <span aria-hidden="true">▶</span>
+            {disabled ? 'Experiment running' : 'Start experiment'}
+          </button>
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={disabled}
+            onClick={() => void runAll()}
+          >
+            <span aria-hidden="true">↻</span>
+            {batchProgress?.status === 'running'
+              ? `Running ${batchProgress.current} of ${batchProgress.total}`
+              : 'Run all 6 sequentially'}
+          </button>
+        </div>
+        <p className="suite-hint">
+          Uses these workload values for every broker and pattern. Runs are
+          sequential so results do not compete for local resources.
+        </p>
       </form>
     </section>
+  );
+}
+
+function BatchStatus({ progress }: { readonly progress: BatchProgress }) {
+  const message =
+    progress.status === 'completed'
+      ? 'Suite complete'
+      : progress.status === 'stopped'
+        ? 'Suite stopped'
+        : `Running experiment ${progress.current} of ${progress.total}`;
+
+  return (
+    <div className={`batch-status batch-${progress.status}`} aria-live="polite">
+      <div>
+        <strong>{message}</strong>
+        <span>
+          {progress.completed}/{progress.total} finished
+        </span>
+      </div>
+      <div className="batch-track" aria-hidden="true">
+        <span
+          style={{ width: `${(progress.completed / progress.total) * 100}%` }}
+        />
+      </div>
+    </div>
   );
 }
 

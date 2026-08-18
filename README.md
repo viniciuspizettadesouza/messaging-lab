@@ -9,6 +9,7 @@ This project is an educational lab, not a universal broker ranking. Results desc
 ## What you can explore
 
 - Run live fan-out and competing-consumer experiments against three real brokers.
+- Queue all six broker/pattern combinations sequentially with one button.
 - Configure message count, payload size, producer concurrency, consumers, and timeout.
 - Watch publishing and consumption progress through Server-Sent Events (SSE).
 - Compare throughput and p50/p95/p99 end-to-end latency.

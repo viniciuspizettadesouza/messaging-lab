@@ -1,17 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type {
-  BrokerInfo,
-  Run,
-  RunEvent,
-  StartRunRequest,
+import {
+  BROKER_IDS,
+  SCENARIO_IDS,
+  type BrokerId,
+  type BrokerInfo,
+  type Run,
+  type RunEvent,
+  type ScenarioId,
+  type StartRunRequest,
 } from '@messaging-lab/shared';
 
 import { ApiClient, type DashboardApi } from './api/client.js';
 import { BrokerOverview } from './components/broker-overview.js';
 import { CapabilityMatrix } from './components/capability-matrix.js';
 import { ComparisonCharts } from './components/comparison-charts.js';
-import { ExperimentForm } from './components/experiment-form.js';
+import {
+  ExperimentForm,
+  type BatchProgress,
+} from './components/experiment-form.js';
 import { RunDetail } from './components/run-detail.js';
 import { RunHistory } from './components/run-history.js';
 
@@ -22,6 +29,12 @@ const terminalStatuses = new Set([
   'timed-out',
   'cancelled',
 ]);
+
+interface BatchQueue {
+  completed: number;
+  readonly total: number;
+  readonly remaining: StartRunRequest[];
+}
 
 export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
   const [brokers, setBrokers] = useState<BrokerInfo[]>([]);
@@ -34,7 +47,12 @@ export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState<string | null>(null);
   const [disconnected, setDisconnected] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(
+    null,
+  );
   const unsubscribeRef = useRef<(() => void) | null>(null);
+  const batchQueueRef = useRef<BatchQueue | null>(null);
+  const advanceBatchRef = useRef<() => void>(() => undefined);
 
   const refreshRuns = useCallback(async () => {
     const nextRuns = await api.getRuns();
@@ -84,7 +102,9 @@ export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
             setSelectedRun((current) =>
               current ? { ...current, status: event.status } : current,
             );
-            if (terminalStatuses.has(event.status)) void finishRun(runId);
+            if (terminalStatuses.has(event.status)) {
+              void finishRun(runId).finally(() => advanceBatchRef.current());
+            }
           }
         },
       });
@@ -119,22 +139,116 @@ export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
     };
   }, [api, stopSubscription, watchRun]);
 
+  const launchRun = useCallback(
+    async (request: StartRunRequest): Promise<boolean> => {
+      setPageError(null);
+      setProgress(null);
+      setDisconnected(false);
+      try {
+        const run = await api.startRun(request);
+        setSelectedRun(run);
+        setRuns((current) => [
+          run,
+          ...current.filter(({ id }) => id !== run.id),
+        ]);
+        watchRun(run.id);
+        return true;
+      } catch (error) {
+        setPageError(errorMessage(error));
+        return false;
+      }
+    },
+    [api, watchRun],
+  );
+
+  const advanceBatch = useCallback(async () => {
+    const batch = batchQueueRef.current;
+    if (!batch) return;
+    batch.completed += 1;
+    const next = batch.remaining.shift();
+
+    if (!next) {
+      batchQueueRef.current = null;
+      setBatchProgress({
+        completed: batch.total,
+        current: batch.total,
+        total: batch.total,
+        status: 'completed',
+      });
+      return;
+    }
+
+    setBatchProgress({
+      completed: batch.completed,
+      current: batch.completed + 1,
+      total: batch.total,
+      status: 'running',
+    });
+    await delay(100);
+    if (batchQueueRef.current !== batch) return;
+    if (!(await launchRun(next))) {
+      batchQueueRef.current = null;
+      setBatchProgress({
+        completed: batch.completed,
+        current: batch.completed + 1,
+        total: batch.total,
+        status: 'stopped',
+      });
+    }
+  }, [launchRun]);
+
+  useEffect(() => {
+    advanceBatchRef.current = () => void advanceBatch();
+  }, [advanceBatch]);
+
   async function startRun(request: StartRunRequest): Promise<void> {
-    setPageError(null);
-    setProgress(null);
-    setDisconnected(false);
-    try {
-      const run = await api.startRun(request);
-      setSelectedRun(run);
-      setRuns((current) => [run, ...current.filter(({ id }) => id !== run.id)]);
-      watchRun(run.id);
-    } catch (error) {
-      setPageError(errorMessage(error));
+    batchQueueRef.current = null;
+    setBatchProgress(null);
+    await launchRun(request);
+  }
+
+  async function runAll(request: StartRunRequest): Promise<void> {
+    const configurations = BROKER_IDS.flatMap((broker: BrokerId) =>
+      SCENARIO_IDS.map((scenario: ScenarioId) => ({
+        ...request,
+        broker,
+        scenario,
+      })),
+    );
+    const first = configurations.shift();
+    if (!first) return;
+
+    const batch: BatchQueue = {
+      completed: 0,
+      total: configurations.length + 1,
+      remaining: configurations,
+    };
+    batchQueueRef.current = batch;
+    setBatchProgress({ completed: 0, current: 1, total: 6, status: 'running' });
+    if (!(await launchRun(first))) {
+      batchQueueRef.current = null;
+      setBatchProgress({
+        completed: 0,
+        current: 1,
+        total: 6,
+        status: 'stopped',
+      });
     }
   }
 
   async function cancelRun(): Promise<void> {
     if (!selectedRun) return;
+    const batch = batchQueueRef.current;
+    if (batch) {
+      batchQueueRef.current = null;
+      setBatchProgress({
+        completed: batch.completed,
+        current: batch.completed + 1,
+        total: batch.total,
+        status: 'stopped',
+      });
+    }
+    setPageError(null);
     try {
       await api.cancelRun(selectedRun.id);
     } catch (error) {
@@ -154,6 +268,8 @@ export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
 
   const active =
     selectedRun?.status === 'pending' || selectedRun?.status === 'running';
+  const controlsDisabled =
+    Boolean(active) || batchProgress?.status === 'running';
 
   return (
     <div className="app-shell">
@@ -222,7 +338,12 @@ export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
           <>
             <BrokerOverview brokers={brokers} />
             <div className="workspace-grid" id="experiment">
-              <ExperimentForm disabled={Boolean(active)} onStart={startRun} />
+              <ExperimentForm
+                disabled={controlsDisabled}
+                batchProgress={batchProgress}
+                onStart={startRun}
+                onRunAll={runAll}
+              />
               <RunDetail
                 run={selectedRun}
                 progress={progress}
@@ -259,4 +380,8 @@ function errorMessage(error: unknown): string {
   return error instanceof Error
     ? error.message
     : 'An unexpected error occurred.';
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }

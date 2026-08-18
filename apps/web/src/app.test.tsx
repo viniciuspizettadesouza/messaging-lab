@@ -2,11 +2,16 @@
 
 import './test/setup.js';
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { Run, RunEvent } from '@messaging-lab/shared';
+import {
+  startRunRequestSchema,
+  type Run,
+  type RunEvent,
+  type StartRunRequest,
+} from '@messaging-lab/shared';
 
 import type { DashboardApi, RunEventHandlers } from './api/client.js';
 import { App } from './app.js';
@@ -89,6 +94,84 @@ describe('dashboard', () => {
     expect(api.cancelRun).toHaveBeenCalledWith(runId);
   });
 
+  it('runs every broker and scenario sequentially as one suite', async () => {
+    const startedRuns: Run[] = [];
+    const api = createApi({
+      startRun: vi.fn(async (request: StartRunRequest) => {
+        const configuration = startRunRequestSchema.parse(request);
+        const run = {
+          ...createRun('pending'),
+          id: suiteRunId(startedRuns.length + 1),
+          configuration,
+        };
+        startedRuns.push(run);
+        return run;
+      }),
+      getRun: vi.fn(async (id: string) => ({
+        ...(startedRuns.find((run) => run.id === id) ?? createRun()),
+        status: 'completed' as const,
+      })),
+      getRuns: vi.fn(async () => []),
+    });
+    render(<App api={api} />);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Run all 6 sequentially' }),
+    );
+
+    const expectedOrder = [
+      ['redis', 'fan-out'],
+      ['redis', 'competing-consumers'],
+      ['kafka', 'fan-out'],
+      ['kafka', 'competing-consumers'],
+      ['rabbitmq', 'fan-out'],
+      ['rabbitmq', 'competing-consumers'],
+    ];
+
+    for (const [index, expected] of expectedOrder.entries()) {
+      await waitFor(() =>
+        expect(api.startRun).toHaveBeenCalledTimes(index + 1),
+      );
+      expect(api.startRun).toHaveBeenNthCalledWith(
+        index + 1,
+        expect.objectContaining({ broker: expected[0], scenario: expected[1] }),
+      );
+      api.emit({
+        type: 'status',
+        runId: startedRuns[index]!.id,
+        sequence: index,
+        timestamp,
+        status: 'completed',
+      });
+    }
+
+    expect(await screen.findByText('Suite complete')).toBeInTheDocument();
+    expect(screen.getByText('6/6 finished')).toBeInTheDocument();
+  });
+
+  it('stops the remaining suite queue when the active run is cancelled', async () => {
+    const api = createApi();
+    render(<App api={api} />);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Run all 6 sequentially' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Cancel run' }),
+    );
+    api.emit({
+      type: 'status',
+      runId,
+      sequence: 1,
+      timestamp,
+      status: 'cancelled',
+    });
+
+    expect(await screen.findByText('Suite stopped')).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(api.startRun).toHaveBeenCalledTimes(1);
+  });
+
   it.each(['completed', 'failed', 'timed-out', 'cancelled'] as const)(
     'renders the %s terminal state',
     (status) => {
@@ -154,4 +237,8 @@ function createApi(overrides: Partial<DashboardApi> = {}): FakeApi {
 
 function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function suiteRunId(index: number): string {
+  return `11111111-1111-4111-8111-${String(index).padStart(12, '0')}`;
 }
