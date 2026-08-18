@@ -1,23 +1,31 @@
-import { createServer } from 'node:http';
+import { createApplication } from './app.js';
+import { loadConfig } from './config.js';
 
-import { workspaceNames } from '@messaging-lab/shared';
+const config = loadConfig();
+const { app } = createApplication({ config });
+let shuttingDown = false;
 
-export const apiWorkspace = workspaceNames.api;
+async function shutdown(signal: NodeJS.Signals): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  app.log.info({ signal }, 'Shutting down API');
 
-const host = process.env.API_HOST ?? '0.0.0.0';
-const port = Number.parseInt(process.env.API_PORT ?? '3000', 10);
-
-const server = createServer((request, response) => {
-  if (request.method === 'GET' && request.url === '/health') {
-    response.writeHead(200, { 'content-type': 'application/json' });
-    response.end(JSON.stringify({ status: 'ok' }));
-    return;
+  try {
+    await app.close();
+    process.exitCode = 0;
+  } catch (error) {
+    app.log.error({ err: error }, 'API shutdown failed');
+    process.exitCode = 1;
   }
+}
 
-  response.writeHead(404, { 'content-type': 'application/json' });
-  response.end(JSON.stringify({ error: 'Not Found' }));
-});
+process.once('SIGINT', () => void shutdown('SIGINT'));
+process.once('SIGTERM', () => void shutdown('SIGTERM'));
 
-server.listen(port, host, () => {
-  console.log(`${apiWorkspace} listening on http://${host}:${port}`);
-});
+try {
+  await app.listen({ host: config.host, port: config.port });
+} catch (error) {
+  app.log.fatal({ err: error }, 'API startup failed');
+  await app.close();
+  process.exitCode = 1;
+}

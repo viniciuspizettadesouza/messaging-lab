@@ -26,12 +26,12 @@
 
 ## 4. API foundation and persistence
 
-- [ ] Bootstrap the Fastify API with configuration validation, structured errors, logging, and graceful shutdown.
-- [ ] Configure SQLite and create the schema for runs, configuration, aggregate metrics, notes, and errors.
-- [ ] Add a repository layer for creating, updating, listing, and retrieving runs.
-- [ ] Mark interrupted `pending` or `running` records appropriately when the API restarts.
-- [ ] Implement `GET /api/brokers`, `GET /api/runs`, and `GET /api/runs/:id`.
-- [ ] Add API and persistence unit tests.
+- [x] Bootstrap the Fastify API with configuration validation, structured errors, logging, and graceful shutdown.
+- [x] Configure SQLite and create the schema for runs, configuration, aggregate metrics, notes, and errors.
+- [x] Add a repository layer for creating, updating, listing, and retrieving runs.
+- [x] Mark interrupted `pending` or `running` records appropriately when the API restarts.
+- [x] Implement `GET /api/brokers`, `GET /api/runs`, and `GET /api/runs/:id`.
+- [x] Add API and persistence unit tests.
 
 ## 5. Broker adapters
 
