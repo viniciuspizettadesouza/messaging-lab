@@ -1,0 +1,131 @@
+name: messaging-lab
+
+services:
+  redis:
+    image: redis:8.2.1-alpine3.22
+    command:
+      - redis-server
+      - --appendonly
+      - 'yes'
+      - --requirepass
+      - ${REDIS_PASSWORD:-messaging}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-messaging}
+    ports:
+      - '127.0.0.1:${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli -a "$$REDIS_PASSWORD" ping | grep -q PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  kafka:
+    image: apache/kafka:4.0.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: CONTROLLER://:9093,PLAINTEXT://:29092,PLAINTEXT_HOST://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:${KAFKA_PORT:-9092}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    ports:
+      - '127.0.0.1:${KAFKA_PORT:-9092}:9092'
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          '/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092 >/dev/null 2>&1',
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+
+  rabbitmq:
+    image: rabbitmq:4.1.3-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-messaging}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-messaging}
+    ports:
+      - '127.0.0.1:${RABBITMQ_PORT:-5672}:5672'
+      - '127.0.0.1:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672'
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 5s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NODE_ENV: production
+      API_HOST: 0.0.0.0
+      API_PORT: 3000
+      DATABASE_URL: /app/data/messaging-lab.sqlite
+      REDIS_URL: redis://:${REDIS_PASSWORD:-messaging}@redis:6379
+      KAFKA_BROKERS: kafka:29092
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-messaging}:${RABBITMQ_PASSWORD:-messaging}@rabbitmq:5672
+      RABBITMQ_MANAGEMENT_URL: http://rabbitmq:15672
+    ports:
+      - '127.0.0.1:${API_PORT:-3000}:3000'
+    volumes:
+      - app-data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    init: true
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - '127.0.0.1:${WEB_PORT:-5173}:80'
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--spider', 'http://127.0.0.1/']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+volumes:
+  app-data:
+  kafka-data:
+  rabbitmq-data:
+  redis-data:

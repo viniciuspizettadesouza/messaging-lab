@@ -11,10 +11,10 @@
 
 ## 2. Local infrastructure
 
-- [ ] Create Docker Compose services for Redis, Kafka in KRaft mode, and RabbitMQ with its management interface.
-- [ ] Pin image versions and configure named volumes, health checks, ports, and local-only credentials.
-- [ ] Add API and web container builds and a full-stack `docker compose up --build` workflow.
-- [ ] Document local ports and verify that all health checks become ready from a clean start.
+- [x] Create Docker Compose services for Redis, Kafka in KRaft mode, and RabbitMQ with its management interface.
+- [x] Pin image versions and configure named volumes, health checks, ports, and local-only credentials.
+- [x] Add API and web container builds and a full-stack `docker compose up --build` workflow.
+- [x] Document local ports and verify that all health checks become ready from a clean start.
 
 ## 3. Shared domain contracts
 
