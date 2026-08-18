@@ -1,0 +1,201 @@
+import type { Run, RunEvent } from '@messaging-lab/shared';
+
+import {
+  BROKER_LABELS,
+  SCENARIO_LABELS,
+  formatDate,
+  formatNumber,
+} from '../format.js';
+import { StatusBadge } from './status-badge.js';
+
+interface RunDetailProps {
+  readonly run: Run | null;
+  readonly progress: Extract<RunEvent, { type: 'progress' }> | null;
+  readonly disconnected: boolean;
+  readonly onCancel: () => Promise<void>;
+}
+
+export function RunDetail({
+  run,
+  progress,
+  disconnected,
+  onCancel,
+}: RunDetailProps) {
+  if (!run) {
+    return (
+      <section className="detail-panel empty-state" aria-label="Run details">
+        <span className="empty-icon" aria-hidden="true">
+          ↗
+        </span>
+        <h2>No experiment selected</h2>
+        <p>Start a run or choose one from history to inspect its results.</p>
+      </section>
+    );
+  }
+
+  const active = run.status === 'pending' || run.status === 'running';
+  const progressPercent = progress
+    ? Math.min(
+        100,
+        Math.round((progress.completedUnits / progress.totalUnits) * 100),
+      )
+    : 0;
+
+  return (
+    <section className="detail-panel" aria-labelledby="run-detail-heading">
+      <div className="run-detail-header">
+        <div>
+          <p className="eyebrow">Run {run.id.slice(0, 8)}</p>
+          <h2 id="run-detail-heading">
+            {BROKER_LABELS[run.configuration.broker]} ·{' '}
+            {SCENARIO_LABELS[run.configuration.scenario]}
+          </h2>
+          <p className="muted">Started {formatDate(run.createdAt)}</p>
+        </div>
+        <StatusBadge status={run.status} />
+      </div>
+
+      {disconnected && active ? (
+        <div className="state-notice warning" role="alert">
+          <strong>Live connection lost</strong>
+          <span>
+            The run may still be active. Reload to restore live updates.
+          </span>
+        </div>
+      ) : null}
+
+      {active ? (
+        <div className="live-progress" aria-live="polite">
+          <div className="progress-label">
+            <span>
+              {progress ? phaseLabel(progress.phase) : 'Preparing run'}
+            </span>
+            <strong>{progressPercent}%</strong>
+          </div>
+          <div className="progress-track">
+            <span style={{ width: `${progressPercent}%` }} />
+          </div>
+          <div className="progress-counts">
+            <span>
+              {formatNumber(progress?.publishedMessages ?? 0, 0)} published
+            </span>
+            <span>
+              {formatNumber(progress?.receivedMessages ?? 0, 0)} received
+            </span>
+          </div>
+          <button
+            className="danger-button"
+            type="button"
+            onClick={() => void onCancel()}
+          >
+            Cancel run
+          </button>
+        </div>
+      ) : null}
+
+      {run.metrics ? (
+        <div className="metric-grid">
+          <Metric
+            label="Throughput"
+            value={`${formatNumber(run.metrics.throughputMessagesPerSecond)} msg/s`}
+          />
+          <Metric
+            label="Elapsed"
+            value={`${formatNumber(run.metrics.elapsedMs)} ms`}
+          />
+          <Metric
+            label="p50 latency"
+            value={`${formatNumber(run.metrics.latency.p50Ms, 2)} ms`}
+          />
+          <Metric
+            label="p95 latency"
+            value={`${formatNumber(run.metrics.latency.p95Ms, 2)} ms`}
+          />
+          <Metric
+            label="p99 latency"
+            value={`${formatNumber(run.metrics.latency.p99Ms, 2)} ms`}
+          />
+          <Metric
+            label="Delivered"
+            value={`${formatNumber(run.metrics.receivedMessages, 0)} / ${formatNumber(run.metrics.publishedMessages, 0)}`}
+          />
+          <Metric
+            label="Lost"
+            value={formatNumber(run.metrics.lostMessages, 0)}
+            alert={run.metrics.lostMessages > 0}
+          />
+          <Metric
+            label="Duplicates"
+            value={formatNumber(run.metrics.duplicateMessages, 0)}
+            alert={run.metrics.duplicateMessages > 0}
+          />
+        </div>
+      ) : !active ? (
+        <TerminalMessage status={run.status} />
+      ) : null}
+
+      {run.notes.length > 0 ? (
+        <div className="notes-block">
+          <h3>Semantic notes</h3>
+          <ul>
+            {run.notes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {run.errors.length > 0 ? (
+        <div className="errors-block" role="alert">
+          <h3>Run errors</h3>
+          <ul>
+            {run.errors.map((error) => (
+              <li key={`${error.code}-${error.occurredAt}`}>
+                <strong>{error.code}</strong> {error.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  alert = false,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly alert?: boolean;
+}) {
+  return (
+    <div className={alert ? 'metric alert' : 'metric'}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function TerminalMessage({ status }: { readonly status: Run['status'] }) {
+  const messages = {
+    failed: 'The experiment failed before aggregate metrics were available.',
+    'timed-out': 'The experiment exceeded its configured timeout.',
+    cancelled:
+      'The experiment was cancelled and its broker resources were cleaned up.',
+    completed: 'The experiment completed without aggregate metrics.',
+    pending: '',
+    running: '',
+  } as const;
+  return (
+    <div className={`state-notice ${status}`}>
+      <strong>{messages[status]}</strong>
+    </div>
+  );
+}
+
+function phaseLabel(phase: string): string {
+  return phase
+    .replaceAll('-', ' ')
+    .replace(/^./, (letter) => letter.toUpperCase());
+}

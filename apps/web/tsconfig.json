@@ -3,9 +3,10 @@
   "compilerOptions": {
     "composite": true,
     "jsx": "react-jsx",
-    "outDir": "dist",
+    "noEmit": true,
     "rootDir": "src",
-    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
+    "tsBuildInfoFile": "node_modules/.cache/tsconfig.tsbuildinfo",
+    "types": ["vite/client", "vitest/globals"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "references": [{ "path": "../../packages/shared" }]

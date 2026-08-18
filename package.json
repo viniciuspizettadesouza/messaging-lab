@@ -6,7 +6,7 @@
   "description": "A local-first dashboard for comparing Redis, Kafka, and RabbitMQ messaging patterns.",
   "license": "MIT",
   "engines": {
-    "node": ">=22.0.0",
+    "node": ">=22.12.0",
     "npm": ">=10.0.0"
   },
   "workspaces": [
@@ -15,7 +15,7 @@
   ],
   "scripts": {
     "dev": "concurrently --names shared,api,web --prefix-colors yellow,blue,green \"npm run dev --workspace @messaging-lab/shared\" \"npm run dev --workspace @messaging-lab/api\" \"npm run dev --workspace @messaging-lab/web\"",
-    "build": "tsc -b",
+    "build": "tsc -b && npm run build --workspace @messaging-lab/web",
     "clean": "tsc -b --clean",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
@@ -35,6 +35,7 @@
     "concurrently": "9.2.4",
     "eslint": "9.33.0",
     "eslint-config-prettier": "10.1.8",
+    "jsdom": "27.0.1",
     "prettier": "3.6.2",
     "typescript": "5.9.2",
     "typescript-eslint": "8.40.0",

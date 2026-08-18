@@ -61,15 +61,15 @@
 
 ## 7. Dashboard
 
-- [ ] Bootstrap the React/Vite application and shared API client.
-- [ ] Build the application shell and broker-health overview.
-- [ ] Build the experiment form with validated inputs and broker/scenario capability guidance.
-- [ ] Connect live progress, status, errors, and cancellation through SSE and API calls.
-- [ ] Build run-history and run-detail views.
-- [ ] Add throughput and latency comparison charts.
-- [ ] Add the broker capability matrix and educational explanations of semantic differences.
-- [ ] Implement loading, empty, running, completed, failed, timed-out, cancelled, and disconnected states.
-- [ ] Add component tests for the experiment workflow and main UI states.
+- [x] Bootstrap the React/Vite application and shared API client.
+- [x] Build the application shell and broker-health overview.
+- [x] Build the experiment form with validated inputs and broker/scenario capability guidance.
+- [x] Connect live progress, status, errors, and cancellation through SSE and API calls.
+- [x] Build run-history and run-detail views.
+- [x] Add throughput and latency comparison charts.
+- [x] Add the broker capability matrix and educational explanations of semantic differences.
+- [x] Implement loading, empty, running, completed, failed, timed-out, cancelled, and disconnected states.
+- [x] Add component tests for the experiment workflow and main UI states.
 
 ## 8. End-to-end verification
 

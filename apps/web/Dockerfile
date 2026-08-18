@@ -16,6 +16,6 @@ RUN npm run build --workspace @messaging-lab/shared \
 FROM nginx:1.29.1-alpine3.22 AS runtime
 
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
-COPY apps/web/public /usr/share/nginx/html
+COPY --from=build /app/apps/web/dist /usr/share/nginx/html
 
 EXPOSE 80
