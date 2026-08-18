@@ -40,3 +40,52 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  broker-integration:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start broker services
+        run: docker compose up --detach --wait redis kafka rabbitmq
+
+      - name: Run broker and benchmark integration tests
+        run: npm run test:integration
+
+      - name: Stop broker services
+        if: always()
+        run: docker compose down --volumes --remove-orphans
+
+  smoke:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start stack and complete a default experiment
+        run: npm run test:smoke

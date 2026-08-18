@@ -73,13 +73,13 @@
 
 ## 8. End-to-end verification
 
-- [ ] Add an automated smoke test that starts the stack and completes a default experiment.
-- [ ] Verify fan-out and competing-consumer runs for all three brokers.
-- [ ] Verify replay and recovery only where supported and confirm unsupported states are displayed accurately.
-- [ ] Verify that run history survives application restarts.
-- [ ] Verify cleanup after completion, cancellation, timeout, and failure.
-- [ ] Measure a clean local run and ensure the default workload completes in a practical time.
-- [ ] Extend CI with Docker-backed integration and smoke tests.
+- [x] Add an automated smoke test that starts the stack and completes a default experiment.
+- [x] Verify fan-out and competing-consumer runs for all three brokers.
+- [x] Verify replay and recovery only where supported and confirm unsupported states are displayed accurately.
+- [x] Verify that run history survives application restarts.
+- [x] Verify cleanup after completion, cancellation, timeout, and failure.
+- [x] Measure a clean local run and ensure the default workload completes in a practical time.
+- [x] Extend CI with Docker-backed integration and smoke tests.
 
 ## 9. Documentation and GitHub readiness
 

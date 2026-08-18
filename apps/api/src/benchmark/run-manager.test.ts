@@ -49,6 +49,7 @@ describe('RunManager', () => {
         expect.objectContaining({ type: 'status', status: 'completed' }),
       ]),
     );
+    expect(adapter.cleaned).toBe(true);
   });
 
   it('rejects concurrent runs and supports cancellation', async () => {
@@ -126,6 +127,24 @@ describe('RunManager', () => {
       ]),
     );
   });
+
+  it('cleans up resources after an execution failure', async () => {
+    const adapter = new ExecutionFailureAdapter();
+    const manager = new RunManager(
+      repository,
+      { redis: adapter, kafka: adapter, rabbitmq: adapter },
+      events,
+    );
+    const run = manager.start({
+      broker: 'redis',
+      scenario: 'fan-out',
+      ...BENCHMARK_DEFAULTS,
+    });
+
+    const failed = await waitForStatus(repository, run.id, 'failed');
+    expect(failed.errors[0]).toMatchObject({ code: 'RUN_FAILED' });
+    expect(adapter.cleaned).toBe(true);
+  });
 });
 
 class NeverDeliverAdapter extends ImmediateAdapter {
@@ -154,6 +173,20 @@ class CleanupFailureAdapter extends ImmediateAdapter {
         removedResources: 0,
         failures: [{ resource: 'fake-resource', message: 'Cleanup failed.' }],
       }),
+    };
+  }
+}
+
+class ExecutionFailureAdapter extends ImmediateAdapter {
+  public override async createRun(
+    context: Parameters<ImmediateAdapter['createRun']>[0],
+  ) {
+    const resource = await super.createRun(context);
+    return {
+      ...resource,
+      startConsumers: async () => {
+        throw new Error('Consumer startup failed.');
+      },
     };
   }
 }

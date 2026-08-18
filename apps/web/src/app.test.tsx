@@ -107,6 +107,20 @@ describe('dashboard', () => {
       ).toBeInTheDocument();
     },
   );
+
+  it('shows supported and unsupported broker capabilities explicitly', async () => {
+    const api = createApi();
+    render(<App api={api} />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Capability matrix' }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByLabelText('Supported')).toHaveLength(18);
+    expect(screen.getAllByLabelText('Unsupported')).toHaveLength(6);
+    expect(
+      screen.getByText(/RabbitMQ removes acknowledged messages/),
+    ).toBeInTheDocument();
+  });
 });
 
 interface FakeApi extends DashboardApi {
