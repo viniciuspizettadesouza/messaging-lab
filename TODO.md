@@ -83,11 +83,11 @@
 
 ## 9. Documentation and GitHub readiness
 
-- [ ] Write the README with project goals, architecture, broker comparison, prerequisites, and quick-start commands.
-- [ ] Document benchmark methodology, configuration, limitations, and responsible interpretation of results.
-- [ ] Document the API endpoints and environment variables.
-- [ ] Add architecture and messaging-flow diagrams.
-- [ ] Add dashboard screenshots after the UI is stable.
-- [ ] Run the complete lint, type-check, test, build, and smoke-test suite from a clean checkout.
-- [ ] Review repository contents for secrets, generated files, and machine-specific paths.
-- [ ] Prepare the first local commit; leave remote repository creation and push to the project owner.
+- [x] Write the README with project goals, architecture, broker comparison, prerequisites, and quick-start commands.
+- [x] Document benchmark methodology, configuration, limitations, and responsible interpretation of results.
+- [x] Document the API endpoints and environment variables.
+- [x] Add architecture and messaging-flow diagrams.
+- [x] Add dashboard screenshots after the UI is stable.
+- [x] Run the complete lint, type-check, test, build, and smoke-test suite from a clean checkout.
+- [x] Review repository contents for secrets, generated files, and machine-specific paths.
+- [x] Prepare the first local commit; leave remote repository creation and push to the project owner.

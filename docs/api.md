@@ -1,0 +1,121 @@
+# HTTP API and configuration
+
+The Fastify API listens on `http://localhost:3000` by default. All JSON contracts are defined and validated with Zod in `packages/shared`.
+
+## Endpoints
+
+### `GET /health`
+
+Returns API process health.
+
+```json
+{ "status": "ok" }
+```
+
+### `GET /api/brokers`
+
+Returns Redis, Kafka, and RabbitMQ protocol health plus capability metadata for each scenario. A broker can be unhealthy without preventing information about the other brokers from loading.
+
+### `POST /api/runs`
+
+Validates and starts one asynchronous benchmark. Returns `202 Accepted` with the pending run. Returns `409 Conflict` when another run is active.
+
+```json
+{
+  "broker": "redis",
+  "scenario": "fan-out",
+  "messageCount": 10000,
+  "payloadSizeBytes": 1024,
+  "producerConcurrency": 1,
+  "consumerCount": 1,
+  "timeoutMs": 120000
+}
+```
+
+Only `broker` and `scenario` are required; omitted numeric values receive the documented defaults.
+
+### `GET /api/runs`
+
+Returns newest-first run history with full configuration, status, aggregate metrics, notes, and errors.
+
+| Query parameter | Default | Constraints                                                              |
+| --------------- | ------: | ------------------------------------------------------------------------ |
+| `broker`        |       — | `redis`, `kafka`, or `rabbitmq`                                          |
+| `status`        |       — | `pending`, `running`, `completed`, `failed`, `timed-out`, or `cancelled` |
+| `limit`         |      20 | Integer from 1 to 100                                                    |
+| `offset`        |       0 | Non-negative integer                                                     |
+
+The response includes `runs`, `total`, `limit`, and `offset`.
+
+### `GET /api/runs/:id`
+
+Returns one run by UUID or `404 Not Found` when it does not exist.
+
+### `POST /api/runs/:id/cancel`
+
+Requests cancellation of the active run and returns `202 Accepted`:
+
+```json
+{
+  "runId": "11111111-1111-4111-8111-111111111111",
+  "cancellationRequested": true
+}
+```
+
+Returns `409 Conflict` if the run exists but is no longer active.
+
+### `GET /api/runs/:id/events`
+
+Opens an SSE stream. Existing retained events are sent first, allowing a recently connected dashboard to catch up. The stream closes after a terminal status.
+
+| SSE event  | Payload                                                       |
+| ---------- | ------------------------------------------------------------- |
+| `status`   | Run ID, sequence, timestamp, and lifecycle status             |
+| `progress` | Phase, completed/total units, published count, received count |
+| `metrics`  | Aggregate benchmark metrics                                   |
+| `error`    | Structured run error                                          |
+
+The server sends comment heartbeats on long-lived streams. Nginx proxy buffering is disabled for `/api/` so events reach the dashboard immediately.
+
+## Error format
+
+Validation, lookup, conflict, and internal errors use a consistent envelope:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "The request is invalid.",
+    "details": {}
+  }
+}
+```
+
+## Environment variables
+
+Copy `.env.example` to `.env` for local overrides. The included credentials are local-only defaults.
+
+| Variable                   | Default                                     | Consumer    | Purpose                                   |
+| -------------------------- | ------------------------------------------- | ----------- | ----------------------------------------- |
+| `NODE_ENV`                 | `development`                               | API         | Runtime mode                              |
+| `API_HOST`                 | `0.0.0.0`                                   | API         | API bind address                          |
+| `API_PORT`                 | `3000`                                      | API/Compose | API host port                             |
+| `WEB_PORT`                 | `5173`                                      | Compose     | Dashboard host port                       |
+| `DATABASE_URL`             | `./data/messaging-lab.sqlite`               | API         | SQLite file or `:memory:` in tests        |
+| `REDIS_PORT`               | `6379`                                      | Compose     | Redis host port                           |
+| `REDIS_PASSWORD`           | `messaging`                                 | Compose     | Local Redis password                      |
+| `REDIS_URL`                | `redis://:messaging@localhost:6379`         | API         | Redis connection URL                      |
+| `KAFKA_PORT`               | `9092`                                      | Compose     | Kafka host port and advertised listener   |
+| `KAFKA_BROKERS`            | `localhost:9092`                            | API         | Comma-separated Kafka `host:port` entries |
+| `RABBITMQ_PORT`            | `5672`                                      | Compose     | AMQP host port                            |
+| `RABBITMQ_MANAGEMENT_PORT` | `15672`                                     | Compose     | RabbitMQ management host port             |
+| `RABBITMQ_USER`            | `messaging`                                 | Compose     | Local RabbitMQ user                       |
+| `RABBITMQ_PASSWORD`        | `messaging`                                 | Compose     | Local RabbitMQ password                   |
+| `RABBITMQ_URL`             | `amqp://messaging:messaging@localhost:5672` | API         | AMQP connection URL                       |
+| `RABBITMQ_MANAGEMENT_URL`  | `http://localhost:15672`                    | API         | RabbitMQ management URL                   |
+
+Inside Compose, broker URLs are replaced with service-network addresses such as `redis:6379`, `kafka:29092`, and `rabbitmq:5672`.
+
+## Security scope
+
+The API has no authentication and is designed only for local use. Published ports bind to `127.0.0.1`. Do not expose the stack publicly or reuse the example credentials in another environment.

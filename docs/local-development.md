@@ -31,3 +31,59 @@ default Redis port is already occupied.
 Use `npm run docker:logs` to follow service logs and `npm run docker:down` to
 stop the stack. Run `docker compose down --volumes` when you intentionally want
 to remove all locally persisted broker and application data.
+
+## Run applications from source
+
+Start only the broker containers:
+
+```sh
+docker compose up --detach --wait redis kafka rabbitmq
+```
+
+Then run the shared-package compiler, API reload process, and Vite development
+server together:
+
+```sh
+npm install
+npm run dev
+```
+
+Vite serves the dashboard at <http://localhost:5173> and proxies `/api` to the
+API at <http://localhost:3000>. The API reloads when its TypeScript source
+changes; shared contracts are rebuilt in watch mode.
+
+The source workflow reads the API connection URLs from the shell environment.
+When overriding a broker host port, update its API URL as well. For example:
+
+```sh
+REDIS_PORT=6380 docker compose up --detach redis kafka rabbitmq
+REDIS_URL=redis://:messaging@localhost:6380 npm run dev
+```
+
+## Verification
+
+Unit, API, persistence, and component tests do not require Docker:
+
+```sh
+npm run format:check
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
+
+Docker-backed adapter and benchmark tests expect healthy brokers on the default
+ports:
+
+```sh
+docker compose up --detach --wait redis kafka rabbitmq
+npm run test:integration
+```
+
+The smoke test creates its own Compose project, ports, and volumes. It builds
+the complete stack, runs a default 10,000-message experiment, restarts the API,
+verifies persisted history, and removes its resources:
+
+```sh
+npm run test:smoke
+```
