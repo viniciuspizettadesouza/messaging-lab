@@ -35,17 +35,17 @@
 
 ## 5. Broker adapters
 
-- [ ] Implement Redis connection health and resource cleanup.
-- [ ] Implement Redis Pub/Sub fan-out.
-- [ ] Implement Redis Streams competing consumers, acknowledgements, recovery, and replay demonstration.
-- [ ] Implement Kafka connection health, topic provisioning, and resource cleanup.
-- [ ] Implement Kafka fan-out using separate consumer groups.
-- [ ] Implement Kafka competing consumers, offset commits, recovery, and replay demonstration.
-- [ ] Implement RabbitMQ connection health, exchange/queue provisioning, and resource cleanup.
-- [ ] Implement RabbitMQ fan-out exchanges with one queue per subscriber.
-- [ ] Implement RabbitMQ competing consumers with acknowledgements and recovery.
-- [ ] Return explicit capability metadata for unsupported broker/scenario combinations.
-- [ ] Add Docker-backed integration tests for every adapter and supported scenario.
+- [x] Implement Redis connection health and resource cleanup.
+- [x] Implement Redis Pub/Sub fan-out.
+- [x] Implement Redis Streams competing consumers, acknowledgements, recovery, and replay demonstration.
+- [x] Implement Kafka connection health, topic provisioning, and resource cleanup.
+- [x] Implement Kafka fan-out using separate consumer groups.
+- [x] Implement Kafka competing consumers, offset commits, recovery, and replay demonstration.
+- [x] Implement RabbitMQ connection health, exchange/queue provisioning, and resource cleanup.
+- [x] Implement RabbitMQ fan-out exchanges with one queue per subscriber.
+- [x] Implement RabbitMQ competing consumers with acknowledgements and recovery.
+- [x] Return explicit capability metadata for unsupported broker/scenario combinations.
+- [x] Add Docker-backed integration tests for every adapter and supported scenario.
 
 ## 6. Benchmark engine
 

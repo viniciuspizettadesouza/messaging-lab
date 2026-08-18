@@ -39,6 +39,10 @@ export interface BrokerRunResource {
   startConsumers(onDelivery: DeliveryHandler): Promise<void>;
   publish(message: OutboundMessage): Promise<void>;
   replay?(onDelivery: DeliveryHandler): Promise<void>;
+  demonstrateRecovery?(
+    message: OutboundMessage,
+    onDelivery: DeliveryHandler,
+  ): Promise<void>;
   cleanup(): Promise<CleanupReport>;
 }
 

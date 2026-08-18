@@ -15,10 +15,7 @@ import {
 import Fastify, { type FastifyInstance } from 'fastify';
 import { ZodError } from 'zod';
 
-import {
-  createBrokerHealthChecker,
-  type BrokerHealthChecker,
-} from './broker-health.js';
+import { createBrokerAdapters } from './adapters/index.js';
 import { loadConfig, type ApiConfig } from './config.js';
 import { openDatabase } from './database.js';
 import { ApiError } from './errors.js';
@@ -32,7 +29,7 @@ export interface Application {
 export interface ApplicationOptions {
   readonly config?: ApiConfig;
   readonly database?: DatabaseSync;
-  readonly brokerHealthChecker?: BrokerHealthChecker;
+  readonly brokerHealthChecker?: (broker: BrokerId) => Promise<BrokerHealth>;
   readonly logger?: boolean;
 }
 
@@ -45,8 +42,10 @@ export function createApplication(
   const app = Fastify({
     logger: options.logger ?? config.nodeEnv !== 'test',
   });
+  const adapters = createBrokerAdapters(config);
   const brokerHealthChecker =
-    options.brokerHealthChecker ?? createBrokerHealthChecker(config);
+    options.brokerHealthChecker ??
+    (async (broker: BrokerId) => adapters[broker].checkHealth());
   const recoveredRuns = repository.recoverInterruptedRuns();
 
   if (recoveredRuns > 0) {
