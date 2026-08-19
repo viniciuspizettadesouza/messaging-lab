@@ -13,10 +13,14 @@ flowchart TB
     subgraph API[Fastify API process]
       Routes[HTTP and SSE routes]
       Manager[Single-run lifecycle manager]
+      Scheduler[Persistent suite scheduler]
       Engine[Benchmark engine]
       Repo[Run repository]
+      SuiteRepo[Suite repository]
       Events[Bounded event store]
       Routes --> Manager --> Engine
+      Routes --> Scheduler --> Manager
+      Scheduler --> SuiteRepo
       Manager --> Repo
       Manager --> Events --> Routes
     end
@@ -34,7 +38,7 @@ responses and incoming SSE events are validated at the web boundary. Validation
 failures and structured server errors remain distinct from connectivity,
 conflict, timeout, and broker failures in the client.
 
-## Current sequential runner
+## Sequential runners
 
 The dashboard's “Run all 6 sequentially” action is a client-side convenience.
 It expands the selected workload into the six broker/scenario combinations and
@@ -56,9 +60,37 @@ sequenceDiagram
 
 The queue exists only in browser memory. Reloading or closing the page discards
 the remaining queue, while an already active API run continues and can be
-rediscovered from run history. Runs are persisted individually: there is no
-suite identifier, repetition model, aggregate suite result, or server-side
-queue yet.
+rediscovered from run history.
+
+The API also exposes persistent suites. Suite clients submit a normalized
+workload, broker/scenario combinations, repetitions, ordering strategy, and
+cooldown. The scheduler persists every ordered position first, then starts one
+ordinary run at a time through the same lifecycle manager. The dashboard will
+move to this API in the next UI milestone.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Scheduler
+    participant RunManager
+    participant SQLite
+
+    Client->>Scheduler: POST /api/suites
+    Scheduler->>SQLite: Persist suite and complete order
+    loop Every ordered trial
+      Scheduler->>RunManager: Start one run
+      RunManager->>SQLite: Persist lifecycle and result
+      RunManager-->>Scheduler: Terminal run
+      Scheduler->>Scheduler: Abortable cooldown
+    end
+    Scheduler->>SQLite: Persist terminal suite state
+```
+
+Fixed order repeats the selected combinations unchanged. Rotating order shifts
+the first combination each repetition. Randomized order is shuffled once and
+stored, so reconnects and later inspection see the exact executed sequence.
+Failed, timed-out, and individually cancelled trials remain in the suite and do
+not prevent later trials from running.
 
 ## Run lifecycle
 
@@ -156,10 +188,15 @@ One consumer handles each message. Distribution depends on consumer readiness, b
 
 ## Persistence model
 
-SQLite stores one run row, one optional aggregate-metrics row, capability notes,
-and run errors. Versioned, transactional migrations advance `user_version`
+SQLite stores run state plus suite configuration, lifecycle, errors, and ordered
+suite-run membership. Versioned, transactional migrations advance `user_version`
 before repositories access the database; a database from a newer application
 version is rejected. Typed row mappers translate storage columns into the
 shared runtime-validated domain model. Individual message timings are
 deliberately kept out of the database. Named Docker volumes retain SQLite and
 broker data across ordinary `docker compose down` and restart operations.
+
+An API restart marks pending/running runs as failed and pending/running suites
+as stopped. Automatic suite continuation is intentionally disabled because a
+restart may change the benchmark environment. Graceful suite cancellation and
+shutdown abort both cooldown timers and any active trial.

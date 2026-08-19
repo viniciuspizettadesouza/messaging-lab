@@ -5,12 +5,18 @@ import {
   BROKER_IDS,
   brokersResponseSchema,
   cancelRunResponseSchema,
+  cancelSuiteResponseSchema,
+  createSuiteRequestSchema,
   errorResponseSchema,
   runIdParamsSchema,
   runResponseSchema,
   runsQuerySchema,
   runsResponseSchema,
   startRunRequestSchema,
+  suiteIdParamsSchema,
+  suiteResponseSchema,
+  suitesQuerySchema,
+  suitesResponseSchema,
   type BrokerHealth,
   type BrokerId,
 } from '@messaging-lab/shared';
@@ -23,16 +29,22 @@ import {
   RunManager,
   type BrokerAdapterRegistry,
 } from './benchmark/run-manager.js';
+import { SuiteEventStore } from './benchmark/suite-events.js';
+import { SuiteScheduler } from './benchmark/suite-scheduler.js';
 import { loadConfig, type ApiConfig } from './config.js';
 import { openDatabase } from './database.js';
 import { ApiError } from './errors.js';
 import { RunRepository } from './run-repository.js';
+import { SuiteRepository } from './suite-repository.js';
 
 export interface Application {
   readonly app: FastifyInstance;
   readonly repository: RunRepository;
   readonly runManager: RunManager;
   readonly events: RunEventStore;
+  readonly suiteRepository: SuiteRepository;
+  readonly suiteScheduler: SuiteScheduler;
+  readonly suiteEvents: SuiteEventStore;
 }
 
 export interface ApplicationOptions {
@@ -55,13 +67,25 @@ export function createApplication(
   const adapters = options.brokerAdapters ?? createBrokerAdapters(config);
   const events = new RunEventStore();
   const runManager = new RunManager(repository, adapters, events);
+  const suiteRepository = new SuiteRepository(database, repository);
+  const suiteEvents = new SuiteEventStore();
+  const suiteScheduler = new SuiteScheduler(
+    suiteRepository,
+    runManager,
+    events,
+    suiteEvents,
+  );
   const brokerHealthChecker =
     options.brokerHealthChecker ??
     (async (broker: BrokerId) => adapters[broker].checkHealth());
   const recoveredRuns = repository.recoverInterruptedRuns();
+  const recoveredSuites = suiteRepository.recoverInterruptedSuites();
 
   if (recoveredRuns > 0) {
     app.log.warn({ recoveredRuns }, 'Marked interrupted runs as failed');
+  }
+  if (recoveredSuites > 0) {
+    app.log.warn({ recoveredSuites }, 'Marked interrupted suites as stopped');
   }
 
   app.setNotFoundHandler(async (request, reply) => {
@@ -170,9 +194,103 @@ export function createApplication(
   });
 
   app.post('/api/runs', async (request, reply) => {
+    if (suiteScheduler.activeSuiteId) {
+      throw new ApiError(
+        409,
+        'SUITE_ALREADY_ACTIVE',
+        `Suite ${suiteScheduler.activeSuiteId} is already active.`,
+        { activeSuiteId: suiteScheduler.activeSuiteId },
+      );
+    }
     const configuration = startRunRequestSchema.parse(request.body);
     const run = runManager.start(configuration);
     return reply.status(202).send(runResponseSchema.parse(run));
+  });
+
+  app.post('/api/suites', async (request, reply) => {
+    const suiteRequest = createSuiteRequestSchema.parse(request.body);
+    const suite = suiteScheduler.start(suiteRequest);
+    return reply.status(202).send(suiteResponseSchema.parse(suite));
+  });
+
+  app.get('/api/suites', async (request) => {
+    const query = suitesQuerySchema.parse(request.query);
+    const result = suiteRepository.list(query);
+    return suitesResponseSchema.parse({
+      suites: result.suites,
+      total: result.total,
+      limit: query.limit,
+      offset: query.offset,
+    });
+  });
+
+  app.get('/api/suites/:id', async (request) => {
+    const { id } = suiteIdParamsSchema.parse(request.params);
+    const suite = suiteRepository.getById(id);
+    if (!suite) {
+      throw new ApiError(404, 'SUITE_NOT_FOUND', `Suite ${id} was not found.`);
+    }
+    return suiteResponseSchema.parse(suite);
+  });
+
+  app.post('/api/suites/:id/cancel', async (request, reply) => {
+    const { id } = suiteIdParamsSchema.parse(request.params);
+    suiteScheduler.cancel(id);
+    return reply.status(202).send(
+      cancelSuiteResponseSchema.parse({
+        suiteId: id,
+        cancellationRequested: true,
+      }),
+    );
+  });
+
+  app.get('/api/suites/:id/events', async (request, reply) => {
+    const { id } = suiteIdParamsSchema.parse(request.params);
+    const suite = suiteRepository.getById(id);
+    if (!suite) {
+      throw new ApiError(404, 'SUITE_NOT_FOUND', `Suite ${id} was not found.`);
+    }
+
+    if (suiteEvents.history(id).length === 0) {
+      suiteEvents.publish(id, { type: 'progress', progress: suite.progress });
+      suiteEvents.publish(id, { type: 'summary', summary: suite.summary });
+      suiteEvents.publish(id, { type: 'status', status: suite.status });
+    }
+
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-cache, no-transform',
+      connection: 'keep-alive',
+    });
+    reply.raw.flushHeaders();
+
+    const history = suiteEvents.history(id);
+    for (const event of history) reply.raw.write(formatSseEvent(event));
+    if (
+      history.some(
+        (event) => event.type === 'status' && isTerminalSuite(event.status),
+      )
+    ) {
+      reply.raw.end();
+      return;
+    }
+
+    let unsubscribe: () => void = () => undefined;
+    const heartbeat = setInterval(
+      () => reply.raw.write(': heartbeat\n\n'),
+      15_000,
+    );
+    const close = () => {
+      clearInterval(heartbeat);
+      unsubscribe();
+      if (!reply.raw.writableEnded) reply.raw.end();
+    };
+    unsubscribe = suiteEvents.subscribe(id, (event) => {
+      reply.raw.write(formatSseEvent(event));
+      if (event.type === 'status' && isTerminalSuite(event.status)) close();
+    });
+    request.raw.once('close', close);
   });
 
   app.post('/api/runs/:id/cancel', async (request, reply) => {
@@ -229,11 +347,20 @@ export function createApplication(
   });
 
   app.addHook('onClose', async () => {
+    await suiteScheduler.shutdown();
     await runManager.shutdown();
     database.close();
   });
 
-  return { app, repository, runManager, events };
+  return {
+    app,
+    repository,
+    runManager,
+    events,
+    suiteRepository,
+    suiteScheduler,
+    suiteEvents,
+  };
 }
 
 function getClientErrorStatus(error: unknown): number | null {
@@ -245,4 +372,8 @@ function getClientErrorStatus(error: unknown): number | null {
 
 function isTerminal(status: string): boolean {
   return ['completed', 'failed', 'timed-out', 'cancelled'].includes(status);
+}
+
+function isTerminalSuite(status: string): boolean {
+  return ['completed', 'failed', 'cancelled', 'stopped'].includes(status);
 }

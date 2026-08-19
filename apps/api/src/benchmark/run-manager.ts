@@ -88,6 +88,17 @@ export class RunManager {
     this.activeRun.controller.abort(new RunCancelledError());
   }
 
+  public async waitForCompletion(runId: string): Promise<Run> {
+    const active = this.activeRun;
+    if (!active || active.id !== runId) {
+      const run = this.repository.getById(runId);
+      if (run && isTerminal(run.status)) return run;
+      throw new Error(`Run ${runId} is not active or terminal.`);
+    }
+    await active.completion;
+    return this.repository.requireById(runId);
+  }
+
   public async shutdown(): Promise<void> {
     if (!this.activeRun) return;
     this.activeRun.controller.abort(new RunCancelledError());
@@ -168,6 +179,10 @@ function terminalStatus(error: unknown): RunStatus {
   if (error instanceof RunCancelledError) return 'cancelled';
   if (error instanceof RunTimedOutError) return 'timed-out';
   return 'failed';
+}
+
+function isTerminal(status: RunStatus): boolean {
+  return ['completed', 'failed', 'timed-out', 'cancelled'].includes(status);
 }
 
 function createRunError(error: unknown, status: RunStatus): RunError {

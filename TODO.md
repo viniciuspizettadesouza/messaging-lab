@@ -30,22 +30,22 @@ This checklist continues from the completed MVP. Items are ordered by dependency
 
 ## 11. Persistent benchmark suites
 
-- [ ] Define suite identifiers, statuses, configuration, progress, summary, and event schemas in the shared package.
-- [ ] Add suite configuration limits for repetitions, cooldown, combinations, and total generated runs.
-- [ ] Add SQLite tables for suites and ordered suite-run membership.
-- [ ] Implement a suite repository with create, update, list, and detail operations.
-- [ ] Implement a server-side scheduler that respects the single-active-run rule.
-- [ ] Persist the complete execution order before the first run starts.
-- [ ] Support fixed, rotating, and reproducibly randomized order strategies.
-- [ ] Implement cooldown between runs using abortable scheduling.
-- [ ] Stop queued work and cancel the active run when a suite is cancelled.
-- [ ] Mark an interrupted suite as stopped during API restart recovery.
-- [ ] Implement `POST /api/suites`.
-- [ ] Implement `GET /api/suites` and `GET /api/suites/:id`.
-- [ ] Implement `GET /api/suites/:id/events` with replayable SSE state.
-- [ ] Implement `POST /api/suites/:id/cancel`.
-- [ ] Add unit tests for scheduling, ordering, failure continuation policy, cancellation, and restart recovery.
-- [ ] Add API tests for every suite endpoint and event transition.
+- [x] Define suite identifiers, statuses, configuration, progress, summary, and event schemas in the shared package.
+- [x] Add suite configuration limits for repetitions, cooldown, combinations, and total generated runs.
+- [x] Add SQLite tables for suites and ordered suite-run membership.
+- [x] Implement a suite repository with create, update, list, and detail operations.
+- [x] Implement a server-side scheduler that respects the single-active-run rule.
+- [x] Persist the complete execution order before the first run starts.
+- [x] Support fixed, rotating, and reproducibly randomized order strategies.
+- [x] Implement cooldown between runs using abortable scheduling.
+- [x] Stop queued work and cancel the active run when a suite is cancelled.
+- [x] Mark an interrupted suite as stopped during API restart recovery.
+- [x] Implement `POST /api/suites`.
+- [x] Implement `GET /api/suites` and `GET /api/suites/:id`.
+- [x] Implement `GET /api/suites/:id/events` with replayable SSE state.
+- [x] Implement `POST /api/suites/:id/cancel`.
+- [x] Add unit tests for scheduling, ordering, failure continuation policy, cancellation, and restart recovery.
+- [x] Add API tests for every suite endpoint and event transition.
 
 ## 12. Suite experience in the dashboard
 

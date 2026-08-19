@@ -64,6 +64,48 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX IF NOT EXISTS run_errors_run_id_idx ON run_errors (run_id, id);
     `,
   },
+  {
+    version: 2,
+    name: 'persistent benchmark suites',
+    sql: `
+      CREATE TABLE suites (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 120),
+        configuration_json TEXT NOT NULL CHECK (json_valid(configuration_json)),
+        status TEXT NOT NULL CHECK (
+          status IN ('pending', 'running', 'completed', 'failed', 'cancelled', 'stopped')
+        ),
+        created_at TEXT NOT NULL,
+        started_at TEXT,
+        finished_at TEXT,
+        stop_reason TEXT
+      ) STRICT;
+      CREATE INDEX suites_created_at_idx ON suites (created_at DESC);
+      CREATE INDEX suites_status_idx ON suites (status);
+
+      CREATE TABLE suite_runs (
+        suite_id TEXT NOT NULL REFERENCES suites(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL CHECK (position >= 0),
+        combination_index INTEGER NOT NULL CHECK (combination_index >= 0),
+        repetition INTEGER NOT NULL CHECK (repetition > 0),
+        broker TEXT NOT NULL CHECK (broker IN ('redis', 'kafka', 'rabbitmq')),
+        scenario TEXT NOT NULL CHECK (scenario IN ('fan-out', 'competing-consumers')),
+        run_id TEXT UNIQUE REFERENCES runs(id) ON DELETE SET NULL,
+        PRIMARY KEY (suite_id, position)
+      ) STRICT;
+      CREATE INDEX suite_runs_run_id_idx ON suite_runs (run_id);
+
+      CREATE TABLE suite_errors (
+        id INTEGER PRIMARY KEY,
+        suite_id TEXT NOT NULL REFERENCES suites(id) ON DELETE CASCADE,
+        code TEXT NOT NULL CHECK (length(code) > 0),
+        message TEXT NOT NULL CHECK (length(message) > 0),
+        occurred_at TEXT NOT NULL,
+        details_json TEXT
+      ) STRICT;
+      CREATE INDEX suite_errors_suite_id_idx ON suite_errors (suite_id, id);
+    `,
+  },
 ];
 
 export function migrateDatabase(database: DatabaseSync): void {

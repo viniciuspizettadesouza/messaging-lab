@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { BENCHMARK_DEFAULTS } from '@messaging-lab/shared';
 
 import { openDatabase } from './database.js';
-import { migrateDatabase } from './migrations.js';
+import { migrateDatabase, migrations } from './migrations.js';
 import { RunRepository } from './run-repository.js';
 
 const temporaryDirectories: string[] = [];
@@ -42,7 +42,7 @@ describe('openDatabase', () => {
 
     expect(secondRepository.getById(created.id)).toEqual(created);
     expect(secondDatabase.prepare('PRAGMA user_version').get()).toMatchObject({
-      user_version: 1,
+      user_version: 2,
     });
     secondDatabase.close();
   });
@@ -50,13 +50,53 @@ describe('openDatabase', () => {
   it('applies pending migrations once and keeps the schema current', () => {
     const database = openDatabase(':memory:');
     expect(database.prepare('PRAGMA user_version').get()).toEqual({
-      user_version: 1,
+      user_version: 2,
     });
     expect(() => migrateDatabase(database)).not.toThrow();
     expect(
       database
         .prepare(
           "SELECT COUNT(*) AS count FROM sqlite_master WHERE name = 'runs'",
+        )
+        .get(),
+    ).toEqual({ count: 1 });
+    expect(
+      database
+        .prepare(
+          "SELECT COUNT(*) AS count FROM sqlite_master WHERE name IN ('suites', 'suite_runs')",
+        )
+        .get(),
+    ).toEqual({ count: 2 });
+    database.close();
+  });
+
+  it('upgrades a version-one database without losing existing runs', () => {
+    const database = new DatabaseSync(':memory:');
+    database.exec(migrations[0]!.sql);
+    database.exec('PRAGMA user_version = 1;');
+    database
+      .prepare(
+        `INSERT INTO runs (
+          id, broker, scenario, message_count, payload_size_bytes,
+          producer_concurrency, consumer_count, timeout_ms, status, created_at
+        ) VALUES (?, 'redis', 'fan-out', 1, 1, 1, 1, 1000, 'completed', ?)`,
+      )
+      .run('11111111-1111-4111-8111-111111111111', '2026-08-19T12:00:00.000Z');
+
+    migrateDatabase(database);
+
+    expect(database.prepare('PRAGMA user_version').get()).toEqual({
+      user_version: 2,
+    });
+    expect(
+      database.prepare('SELECT COUNT(*) AS count FROM runs').get(),
+    ).toEqual({
+      count: 1,
+    });
+    expect(
+      database
+        .prepare(
+          "SELECT COUNT(*) AS count FROM sqlite_master WHERE name = 'suites'",
         )
         .get(),
     ).toEqual({ count: 1 });
@@ -71,6 +111,6 @@ describe('openDatabase', () => {
     futureDatabase.exec('PRAGMA user_version = 999;');
     futureDatabase.close();
 
-    expect(() => openDatabase(path)).toThrow('newer than supported version 1');
+    expect(() => openDatabase(path)).toThrow('newer than supported version 2');
   });
 });

@@ -10,6 +10,19 @@ export const RUN_STATUSES = [
   'timed-out',
   'cancelled',
 ] as const;
+export const SUITE_STATUSES = [
+  'pending',
+  'running',
+  'completed',
+  'failed',
+  'cancelled',
+  'stopped',
+] as const;
+export const SUITE_ORDER_STRATEGIES = [
+  'fixed',
+  'rotating',
+  'randomized',
+] as const;
 export const CAPABILITY_FLAGS = [
   'persistence',
   'acknowledgements',
@@ -20,6 +33,8 @@ export const CAPABILITY_FLAGS = [
 export const brokerIdSchema = z.enum(BROKER_IDS);
 export const scenarioIdSchema = z.enum(SCENARIO_IDS);
 export const runStatusSchema = z.enum(RUN_STATUSES);
+export const suiteStatusSchema = z.enum(SUITE_STATUSES);
+export const suiteOrderStrategySchema = z.enum(SUITE_ORDER_STRATEGIES);
 export const capabilityFlagSchema = z.enum(CAPABILITY_FLAGS);
 
 export const scenarioCapabilitiesSchema = z
@@ -76,6 +91,8 @@ export const benchmarkMetricsSchema = z
 export type BrokerId = z.infer<typeof brokerIdSchema>;
 export type ScenarioId = z.infer<typeof scenarioIdSchema>;
 export type RunStatus = z.infer<typeof runStatusSchema>;
+export type SuiteStatus = z.infer<typeof suiteStatusSchema>;
+export type SuiteOrderStrategy = z.infer<typeof suiteOrderStrategySchema>;
 export type CapabilityFlag = z.infer<typeof capabilityFlagSchema>;
 export type ScenarioCapabilities = z.infer<typeof scenarioCapabilitiesSchema>;
 export type BrokerCapabilities = z.infer<typeof brokerCapabilitiesSchema>;

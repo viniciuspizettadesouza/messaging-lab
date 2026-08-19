@@ -17,13 +17,16 @@ This project is an educational lab, not a universal broker ranking. Results desc
 - Compare throughput and p50/p95/p99 end-to-end latency.
 - Inspect delivery counts, loss, duplicates, capability notes, and errors.
 - Keep aggregate run history in SQLite across application restarts.
+- Create persistent suites through the API with repetitions, stored ordering,
+  cooldown, cancellation, and SSE progress.
 - See where persistence, acknowledgements, recovery, and replay are genuinely supported.
 
 The current “Run all 6 sequentially” action is coordinated by the browser. It
 starts one ordinary run after another, and each result is persisted separately.
 Reloading or closing the dashboard stops the remaining browser queue, although
-the active API run continues. Persistent suites, repetitions, and aggregate
-statistics are planned but are not implemented yet.
+the active API run continues. The persistent suite API is now available, but
+the dashboard has not switched to it yet. Distribution-aware aggregate
+statistics are planned separately.
 
 ## Quick start
 
@@ -69,11 +72,14 @@ flowchart LR
 | `packages/shared` | Zod contracts, domain types, limits, and capability metadata           |
 | `scripts`         | Docker Compose wrapper and isolated full-stack smoke verification      |
 
-The API permits one active run at a time. Every run receives isolated broker resource names; completion, cancellation, timeout, and failure all enter the cleanup path.
+The API permits one active run at a time. A persistent suite reserves that run
+lane while it serially schedules its trials. Every run receives isolated broker
+resource names; completion, cancellation, timeout, and failure all enter the
+cleanup path.
 
-The dashboard can queue all six broker/pattern combinations, but that queue is
-currently frontend state rather than an API resource. See the architecture
-document for the current execution flow and its limitations.
+The dashboard's six-run queue is still frontend state; server-managed suites
+are currently available through the HTTP API. See the architecture document
+for both execution flows.
 
 More detail and messaging-flow diagrams are in [architecture](docs/architecture.md).
 

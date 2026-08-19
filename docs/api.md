@@ -77,6 +77,70 @@ Opens an SSE stream. Existing retained events are sent first, allowing a recentl
 
 The server sends comment heartbeats on long-lived streams. Nginx proxy buffering is disabled for `/api/` so events reach the dashboard immediately.
 
+### `POST /api/suites`
+
+Validates, persists, and starts a server-managed suite. The complete execution
+order is stored before the first trial begins. A suite reserves the single
+benchmark lane until it completes or is cancelled, including cooldown periods.
+
+```json
+{
+  "name": "Durable messaging comparison",
+  "workload": {
+    "messageCount": 10000,
+    "payloadSizeBytes": 1024,
+    "producerConcurrency": 1,
+    "consumerCount": 1,
+    "timeoutMs": 120000
+  },
+  "combinations": [
+    { "broker": "redis", "scenario": "competing-consumers" },
+    { "broker": "kafka", "scenario": "competing-consumers" },
+    { "broker": "rabbitmq", "scenario": "competing-consumers" }
+  ],
+  "repetitions": 3,
+  "orderStrategy": "rotating",
+  "cooldownMs": 1000
+}
+```
+
+Workload fields use the standalone-run defaults. Suite defaults are three
+repetitions, fixed order, and a 1,000 ms cooldown. A suite accepts at most six
+unique combinations, 20 repetitions, a 60,000 ms cooldown, and 100 generated
+runs. Supported order strategies are `fixed`, `rotating`, and `randomized`.
+Randomized order is generated once and persisted with the suite.
+
+### `GET /api/suites`
+
+Returns newest-first suites, including configuration, progress, lifecycle
+summary, errors, and ordered trial membership. It accepts an optional `status`
+filter plus the same `limit` and `offset` pagination fields as run history.
+Suite statuses are `pending`, `running`, `completed`, `failed`, `cancelled`, and
+`stopped`.
+
+### `GET /api/suites/:id`
+
+Returns one suite and every ordered trial. Entries for queued trials have a
+null `run`; started trials embed their persisted run.
+
+### `POST /api/suites/:id/cancel`
+
+Aborts an active cooldown, cancels the active trial, and leaves remaining
+ordered trials queued. Returns `202 Accepted`; terminal suites return
+`409 Conflict`.
+
+### `GET /api/suites/:id/events`
+
+Opens a replayable SSE stream containing suite `status`, `progress`, `summary`,
+`run-event`, and `error` events. A `run-event` wraps the validated SSE event for
+the current trial. In-memory history is replayed on reconnect; after an API
+restart the persisted progress, summary, and terminal state are synthesized.
+The stream closes when the suite reaches a terminal status.
+
+If the API restarts during a suite, active runs are marked `failed` and the
+suite is marked `stopped`. Suites are not automatically resumed because host
+conditions may have changed.
+
 ## Error format
 
 Validation, lookup, conflict, and internal errors use a consistent envelope:

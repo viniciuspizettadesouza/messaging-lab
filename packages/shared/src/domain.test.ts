@@ -6,6 +6,8 @@ import {
   capabilityFlagSchema,
   runStatusSchema,
   scenarioIdSchema,
+  suiteOrderStrategySchema,
+  suiteStatusSchema,
 } from './domain.js';
 
 const validMetrics = {
@@ -29,12 +31,16 @@ describe('domain identifier schemas', () => {
     expect(capabilityFlagSchema.parse('consumerRecovery')).toBe(
       'consumerRecovery',
     );
+    expect(suiteStatusSchema.parse('stopped')).toBe('stopped');
+    expect(suiteOrderStrategySchema.parse('randomized')).toBe('randomized');
   });
 
   it('rejects identifiers outside the contract', () => {
     expect(brokerIdSchema.safeParse('nats').success).toBe(false);
     expect(scenarioIdSchema.safeParse('replay').success).toBe(false);
     expect(runStatusSchema.safeParse('stopped').success).toBe(false);
+    expect(suiteStatusSchema.safeParse('timed-out').success).toBe(false);
+    expect(suiteOrderStrategySchema.safeParse('shuffled').success).toBe(false);
   });
 });
 

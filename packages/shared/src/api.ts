@@ -1,15 +1,22 @@
 import { z } from 'zod';
 
-import { runConfigurationSchema } from './configuration.js';
+import {
+  runConfigurationSchema,
+  suiteCombinationSchema,
+  suiteConfigurationSchema,
+  suiteNameSchema,
+} from './configuration.js';
 import {
   benchmarkMetricsSchema,
   brokerCapabilitiesSchema,
   brokerIdSchema,
   runStatusSchema,
+  suiteStatusSchema,
 } from './domain.js';
 
 export const isoTimestampSchema = z.string().datetime({ offset: true });
 export const runIdSchema = z.uuid();
+export const suiteIdSchema = z.uuid();
 
 export const runErrorSchema = z
   .object({
@@ -31,6 +38,115 @@ export const runSchema = z
     metrics: benchmarkMetricsSchema.nullable(),
     notes: z.array(z.string().min(1)),
     errors: z.array(runErrorSchema),
+  })
+  .strict();
+
+export const suiteErrorSchema = runErrorSchema;
+
+export const suiteProgressSchema = z
+  .object({
+    completedRuns: z.number().int().nonnegative(),
+    totalRuns: z.number().int().positive(),
+    currentPosition: z.number().int().nonnegative().nullable(),
+    currentCombination: suiteCombinationSchema.nullable(),
+    currentRepetition: z.number().int().positive().nullable(),
+    activeRunId: runIdSchema.nullable(),
+  })
+  .strict()
+  .superRefine(({ completedRuns, totalRuns, currentPosition }, context) => {
+    if (completedRuns > totalRuns) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Completed runs cannot exceed total runs.',
+        path: ['completedRuns'],
+      });
+    }
+    if (currentPosition !== null && currentPosition >= totalRuns) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Current position must be within the suite execution order.',
+        path: ['currentPosition'],
+      });
+    }
+  });
+
+export const suiteSummarySchema = z
+  .object({
+    totalRuns: z.number().int().positive(),
+    pendingRuns: z.number().int().nonnegative(),
+    runningRuns: z.number().int().nonnegative(),
+    completedRuns: z.number().int().nonnegative(),
+    failedRuns: z.number().int().nonnegative(),
+    timedOutRuns: z.number().int().nonnegative(),
+    cancelledRuns: z.number().int().nonnegative(),
+  })
+  .strict()
+  .superRefine((summary, context) => {
+    const accountedRuns =
+      summary.pendingRuns +
+      summary.runningRuns +
+      summary.completedRuns +
+      summary.failedRuns +
+      summary.timedOutRuns +
+      summary.cancelledRuns;
+
+    if (accountedRuns !== summary.totalRuns) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Suite summary counts must equal total runs.',
+        path: ['totalRuns'],
+      });
+    }
+  });
+
+export const suiteRunSchema = z
+  .object({
+    position: z.number().int().nonnegative(),
+    combinationIndex: z.number().int().nonnegative(),
+    repetition: z.number().int().positive(),
+    combination: suiteCombinationSchema,
+    run: runSchema.nullable(),
+  })
+  .strict();
+
+export const suiteSchema = z
+  .object({
+    id: suiteIdSchema,
+    name: suiteNameSchema,
+    status: suiteStatusSchema,
+    configuration: suiteConfigurationSchema,
+    progress: suiteProgressSchema,
+    summary: suiteSummarySchema,
+    createdAt: isoTimestampSchema,
+    startedAt: isoTimestampSchema.nullable(),
+    finishedAt: isoTimestampSchema.nullable(),
+    stopReason: z.string().min(1).nullable(),
+    errors: z.array(suiteErrorSchema),
+    runs: z.array(suiteRunSchema),
+  })
+  .strict();
+
+export const suiteResponseSchema = suiteSchema;
+export const suiteIdParamsSchema = z.object({ id: suiteIdSchema }).strict();
+export const suitesQuerySchema = z
+  .object({
+    status: suiteStatusSchema.optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    offset: z.coerce.number().int().nonnegative().default(0),
+  })
+  .strict();
+export const suitesResponseSchema = z
+  .object({
+    suites: z.array(suiteSchema),
+    total: z.number().int().nonnegative(),
+    limit: z.number().int().positive(),
+    offset: z.number().int().nonnegative(),
+  })
+  .strict();
+export const cancelSuiteResponseSchema = z
+  .object({
+    suiteId: suiteIdSchema,
+    cancellationRequested: z.literal(true),
   })
   .strict();
 
@@ -151,6 +267,56 @@ export const runEventSchema = z.discriminatedUnion('type', [
     .strict(),
 ]);
 
+const suiteEventBase = {
+  suiteId: suiteIdSchema,
+  sequence: z.number().int().nonnegative(),
+  timestamp: isoTimestampSchema,
+};
+
+export const suiteEventSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      ...suiteEventBase,
+      type: z.literal('status'),
+      status: suiteStatusSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...suiteEventBase,
+      type: z.literal('progress'),
+      progress: suiteProgressSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...suiteEventBase,
+      type: z.literal('run-event'),
+      runEvent: runEventSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...suiteEventBase,
+      type: z.literal('summary'),
+      summary: suiteSummarySchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...suiteEventBase,
+      type: z.literal('error'),
+      error: suiteErrorSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...suiteEventBase,
+      type: z.literal('heartbeat'),
+    })
+    .strict(),
+]);
+
 export type RunError = z.infer<typeof runErrorSchema>;
 export type Run = z.infer<typeof runSchema>;
 export type BrokerHealth = z.infer<typeof brokerHealthSchema>;
@@ -164,3 +330,15 @@ export type CancelRunResponse = z.infer<typeof cancelRunResponseSchema>;
 export type ErrorResponse = z.infer<typeof errorResponseSchema>;
 export type RunPhase = z.infer<typeof runPhaseSchema>;
 export type RunEvent = z.infer<typeof runEventSchema>;
+export type SuiteId = z.infer<typeof suiteIdSchema>;
+export type SuiteError = z.infer<typeof suiteErrorSchema>;
+export type SuiteProgress = z.infer<typeof suiteProgressSchema>;
+export type SuiteSummary = z.infer<typeof suiteSummarySchema>;
+export type SuiteRun = z.infer<typeof suiteRunSchema>;
+export type Suite = z.infer<typeof suiteSchema>;
+export type SuiteEvent = z.infer<typeof suiteEventSchema>;
+export type SuiteResponse = z.infer<typeof suiteResponseSchema>;
+export type SuiteIdParams = z.infer<typeof suiteIdParamsSchema>;
+export type SuitesQuery = z.output<typeof suitesQuerySchema>;
+export type SuitesResponse = z.infer<typeof suitesResponseSchema>;
+export type CancelSuiteResponse = z.infer<typeof cancelSuiteResponseSchema>;

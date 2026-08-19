@@ -3,8 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   BENCHMARK_DEFAULTS,
   BENCHMARK_LIMITS,
+  createSuiteRequestSchema,
   runConfigurationSchema,
   startRunRequestSchema,
+  suiteConfigurationSchema,
+  SUITE_DEFAULTS,
+  SUITE_LIMITS,
 } from './configuration.js';
 
 const requiredSelection = {
@@ -81,5 +85,104 @@ describe('startRunRequestSchema', () => {
 describe('runConfigurationSchema', () => {
   it('requires a fully resolved configuration', () => {
     expect(() => runConfigurationSchema.parse(requiredSelection)).toThrow();
+  });
+});
+
+describe('suiteConfigurationSchema', () => {
+  const suiteConfiguration = {
+    workload: BENCHMARK_DEFAULTS,
+    combinations: [
+      { broker: 'redis', scenario: 'competing-consumers' },
+      { broker: 'kafka', scenario: 'fan-out' },
+    ],
+    repetitions: 3,
+    orderStrategy: 'rotating',
+    cooldownMs: 1_000,
+  } as const;
+
+  it('validates a resolved suite configuration', () => {
+    expect(suiteConfigurationSchema.parse(suiteConfiguration)).toEqual(
+      suiteConfiguration,
+    );
+  });
+
+  it('requires at least one unique combination', () => {
+    expect(
+      suiteConfigurationSchema.safeParse({
+        ...suiteConfiguration,
+        combinations: [],
+      }).success,
+    ).toBe(false);
+    expect(
+      suiteConfigurationSchema.safeParse({
+        ...suiteConfiguration,
+        combinations: [
+          suiteConfiguration.combinations[0],
+          suiteConfiguration.combinations[0],
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('requires positive repetitions and a non-negative cooldown', () => {
+    expect(
+      suiteConfigurationSchema.safeParse({
+        ...suiteConfiguration,
+        repetitions: 0,
+      }).success,
+    ).toBe(false);
+    expect(
+      suiteConfigurationSchema.safeParse({
+        ...suiteConfiguration,
+        cooldownMs: -1,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('enforces suite field and generated-run limits', () => {
+    expect(
+      suiteConfigurationSchema.safeParse({
+        ...suiteConfiguration,
+        repetitions: SUITE_LIMITS.repetitions.max + 1,
+      }).success,
+    ).toBe(false);
+    expect(
+      suiteConfigurationSchema.safeParse({
+        ...suiteConfiguration,
+        cooldownMs: SUITE_LIMITS.cooldownMs.max + 1,
+      }).success,
+    ).toBe(false);
+    expect(
+      suiteConfigurationSchema.safeParse({
+        ...suiteConfiguration,
+        combinations: [
+          { broker: 'redis', scenario: 'fan-out' },
+          { broker: 'kafka', scenario: 'fan-out' },
+          { broker: 'rabbitmq', scenario: 'fan-out' },
+          { broker: 'redis', scenario: 'competing-consumers' },
+          { broker: 'kafka', scenario: 'competing-consumers' },
+          { broker: 'rabbitmq', scenario: 'competing-consumers' },
+        ],
+        repetitions: 20,
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('createSuiteRequestSchema', () => {
+  it('resolves safe workload and suite defaults', () => {
+    expect(
+      createSuiteRequestSchema.parse({
+        name: '  Default suite  ',
+        combinations: [{ broker: 'kafka', scenario: 'fan-out' }],
+      }),
+    ).toEqual({
+      name: 'Default suite',
+      configuration: {
+        workload: BENCHMARK_DEFAULTS,
+        combinations: [{ broker: 'kafka', scenario: 'fan-out' }],
+        ...SUITE_DEFAULTS,
+      },
+    });
   });
 });

@@ -70,6 +70,9 @@ export class RunEventStore {
   }
 }
 
-export function formatSseEvent(event: RunEvent): string {
+export function formatSseEvent(event: {
+  readonly sequence: number;
+  readonly type: string;
+}): string {
   return `id: ${event.sequence}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
 }

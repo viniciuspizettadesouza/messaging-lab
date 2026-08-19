@@ -4,16 +4,23 @@ import {
   BENCHMARK_DEFAULTS,
   brokersResponseSchema,
   cancelRunResponseSchema,
+  cancelSuiteResponseSchema,
   errorResponseSchema,
   runEventSchema,
   runResponseSchema,
   runsResponseSchema,
+  suiteEventSchema,
+  suiteResponseSchema,
+  suitesResponseSchema,
+  type SuiteConfiguration,
 } from '@messaging-lab/shared';
 
 import { createApplication, type Application } from './app.js';
 import { ImmediateAdapter } from './benchmark/fake-adapter.test-helper.js';
 import type { ApiConfig } from './config.js';
 import { openDatabase } from './database.js';
+import { RunRepository } from './run-repository.js';
+import { SuiteRepository } from './suite-repository.js';
 
 const config: ApiConfig = {
   nodeEnv: 'test',
@@ -209,6 +216,200 @@ describe('API', () => {
     await waitForRunStatus(application, started.id, 'cancelled');
     expect(adapter.cleaned).toBe(true);
   });
+
+  it('creates, lists, retrieves, and replays a completed suite over SSE', async () => {
+    const createResponse = await application.app.inject({
+      method: 'POST',
+      url: '/api/suites',
+      payload: {
+        name: 'API suite',
+        workload: { messageCount: 2, payloadSizeBytes: 16 },
+        combinations: [
+          { broker: 'redis', scenario: 'competing-consumers' },
+          { broker: 'kafka', scenario: 'fan-out' },
+        ],
+        repetitions: 1,
+        orderStrategy: 'rotating',
+        cooldownMs: 0,
+      },
+    });
+
+    expect(createResponse.statusCode).toBe(202);
+    const created = suiteResponseSchema.parse(createResponse.json());
+    const completed = await waitForSuiteStatus(
+      application,
+      created.id,
+      'completed',
+    );
+    expect(completed.summary).toMatchObject({
+      completedRuns: 2,
+      failedRuns: 0,
+    });
+
+    const listResponse = await application.app.inject({
+      method: 'GET',
+      url: '/api/suites?status=completed&limit=10&offset=0',
+    });
+    const detailResponse = await application.app.inject({
+      method: 'GET',
+      url: `/api/suites/${created.id}`,
+    });
+    expect(suitesResponseSchema.parse(listResponse.json())).toMatchObject({
+      total: 1,
+      suites: [{ id: created.id }],
+    });
+    expect(suiteResponseSchema.parse(detailResponse.json()).runs).toHaveLength(
+      2,
+    );
+
+    const eventResponse = await application.app.inject({
+      method: 'GET',
+      url: `/api/suites/${created.id}/events`,
+    });
+    const suiteEvents = eventResponse.body
+      .split('\n')
+      .filter((line) => line.startsWith('data: '))
+      .map((line) => suiteEventSchema.parse(JSON.parse(line.slice(6))));
+    expect(suiteEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'status', status: 'pending' }),
+        expect.objectContaining({ type: 'status', status: 'running' }),
+        expect.objectContaining({ type: 'run-event' }),
+        expect.objectContaining({ type: 'progress' }),
+        expect.objectContaining({ type: 'summary' }),
+        expect.objectContaining({ type: 'status', status: 'completed' }),
+      ]),
+    );
+  });
+
+  it('validates suite creation and returns suite not-found errors', async () => {
+    const invalid = await application.app.inject({
+      method: 'POST',
+      url: '/api/suites',
+      payload: {
+        name: 'Too large',
+        combinations: [
+          { broker: 'redis', scenario: 'fan-out' },
+          { broker: 'kafka', scenario: 'fan-out' },
+          { broker: 'rabbitmq', scenario: 'fan-out' },
+          { broker: 'redis', scenario: 'competing-consumers' },
+          { broker: 'kafka', scenario: 'competing-consumers' },
+          { broker: 'rabbitmq', scenario: 'competing-consumers' },
+        ],
+        repetitions: 20,
+      },
+    });
+    const missing = await application.app.inject({
+      method: 'GET',
+      url: '/api/suites/11111111-1111-4111-8111-111111111111',
+    });
+
+    expect(invalid.statusCode).toBe(400);
+    expect(errorResponseSchema.parse(invalid.json())).toMatchObject({
+      error: { code: 'VALIDATION_ERROR' },
+    });
+    expect(missing.statusCode).toBe(404);
+    expect(errorResponseSchema.parse(missing.json())).toMatchObject({
+      error: { code: 'SUITE_NOT_FOUND' },
+    });
+  });
+
+  it('cancels a suite and its active run through the API', async () => {
+    await application.app.close();
+    const adapter = new NeverDeliverAdapter();
+    application = createApplication({
+      config,
+      database: openDatabase(':memory:'),
+      logger: false,
+      brokerAdapters: { redis: adapter, kafka: adapter, rabbitmq: adapter },
+    });
+    const createResponse = await application.app.inject({
+      method: 'POST',
+      url: '/api/suites',
+      payload: {
+        name: 'Cancelable suite',
+        combinations: [{ broker: 'redis', scenario: 'fan-out' }],
+        repetitions: 2,
+        cooldownMs: 0,
+      },
+    });
+    const suite = suiteResponseSchema.parse(createResponse.json());
+    await waitForSuiteRunStatus(application, suite.id, 'running');
+
+    const conflictingRun = await application.app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      payload: { broker: 'kafka', scenario: 'fan-out' },
+    });
+    expect(conflictingRun.statusCode).toBe(409);
+
+    const cancelResponse = await application.app.inject({
+      method: 'POST',
+      url: `/api/suites/${suite.id}/cancel`,
+    });
+    expect(cancelResponse.statusCode).toBe(202);
+    expect(cancelSuiteResponseSchema.parse(cancelResponse.json())).toEqual({
+      suiteId: suite.id,
+      cancellationRequested: true,
+    });
+    const cancelled = await waitForSuiteStatus(
+      application,
+      suite.id,
+      'cancelled',
+    );
+    expect(cancelled.runs[0]?.run?.status).toBe('cancelled');
+    expect(cancelled.runs[1]?.run).toBeNull();
+
+    const eventResponse = await application.app.inject({
+      method: 'GET',
+      url: `/api/suites/${suite.id}/events`,
+    });
+    const statuses = eventResponse.body
+      .split('\n')
+      .filter((line) => line.startsWith('data: '))
+      .map((line) => suiteEventSchema.parse(JSON.parse(line.slice(6))))
+      .filter((event) => event.type === 'status')
+      .map((event) => event.status);
+    expect(statuses).toEqual(
+      expect.arrayContaining(['pending', 'running', 'cancelled']),
+    );
+  });
+
+  it('marks an interrupted suite as stopped when the application starts', async () => {
+    await application.app.close();
+    const database = openDatabase(':memory:');
+    const runs = new RunRepository(database);
+    const suites = new SuiteRepository(database, runs);
+    const configuration: SuiteConfiguration = {
+      workload: BENCHMARK_DEFAULTS,
+      combinations: [{ broker: 'redis', scenario: 'fan-out' }],
+      repetitions: 1,
+      orderStrategy: 'fixed',
+      cooldownMs: 0,
+    };
+    const interrupted = suites.create('Interrupted', configuration, [
+      {
+        position: 0,
+        combinationIndex: 0,
+        repetition: 1,
+        combination: configuration.combinations[0]!,
+      },
+    ]);
+    const adapter = new ImmediateAdapter();
+    application = createApplication({
+      config,
+      database,
+      logger: false,
+      brokerAdapters: { redis: adapter, kafka: adapter, rabbitmq: adapter },
+    });
+
+    expect(
+      application.suiteRepository.requireById(interrupted.id),
+    ).toMatchObject({
+      status: 'stopped',
+      errors: [{ code: 'SUITE_INTERRUPTED' }],
+    });
+  });
 });
 
 async function waitForCompletedRun(application: Application, runId: string) {
@@ -229,6 +430,34 @@ async function waitForRunStatus(
   }
 
   throw new Error(`Timed out waiting for the run to become ${status}.`);
+}
+
+async function waitForSuiteStatus(
+  application: Application,
+  suiteId: string,
+  status: string,
+) {
+  const deadline = Date.now() + 2_000;
+  while (Date.now() < deadline) {
+    const suite = application.suiteRepository.requireById(suiteId);
+    if (suite.status === status) return suite;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error(`Timed out waiting for the suite to become ${status}.`);
+}
+
+async function waitForSuiteRunStatus(
+  application: Application,
+  suiteId: string,
+  status: string,
+) {
+  const deadline = Date.now() + 2_000;
+  while (Date.now() < deadline) {
+    const suite = application.suiteRepository.requireById(suiteId);
+    if (suite.runs.some(({ run }) => run?.status === status)) return suite;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error(`Timed out waiting for a suite run to become ${status}.`);
 }
 
 class NeverDeliverAdapter extends ImmediateAdapter {

@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
-import { brokerIdSchema, scenarioIdSchema } from './domain.js';
+import {
+  brokerIdSchema,
+  scenarioIdSchema,
+  suiteOrderStrategySchema,
+} from './domain.js';
 
 export const BENCHMARK_LIMITS = {
   messageCount: { min: 1, max: 1_000_000, default: 10_000 },
@@ -18,6 +22,20 @@ export const BENCHMARK_DEFAULTS = {
   timeoutMs: BENCHMARK_LIMITS.timeoutMs.default,
 } as const;
 
+export const SUITE_LIMITS = {
+  repetitions: { min: 1, max: 20, default: 3 },
+  cooldownMs: { min: 0, max: 60_000, default: 1_000 },
+  combinations: { min: 1, max: 6 },
+  totalRuns: { max: 100 },
+  nameLength: { min: 1, max: 120 },
+} as const;
+
+export const SUITE_DEFAULTS = {
+  repetitions: SUITE_LIMITS.repetitions.default,
+  cooldownMs: SUITE_LIMITS.cooldownMs.default,
+  orderStrategy: 'fixed',
+} as const;
+
 const boundedInteger = (limits: { min: number; max: number }) =>
   z.number().int().min(limits.min).max(limits.max);
 
@@ -31,7 +49,118 @@ const configurationFields = {
   timeoutMs: boundedInteger(BENCHMARK_LIMITS.timeoutMs),
 };
 
+const workloadConfigurationFields = {
+  messageCount: configurationFields.messageCount,
+  payloadSizeBytes: configurationFields.payloadSizeBytes,
+  producerConcurrency: configurationFields.producerConcurrency,
+  consumerCount: configurationFields.consumerCount,
+  timeoutMs: configurationFields.timeoutMs,
+};
+
 export const runConfigurationSchema = z.object(configurationFields).strict();
+
+export const workloadConfigurationSchema = z
+  .object(workloadConfigurationFields)
+  .strict();
+
+export const suiteCombinationSchema = z
+  .object({
+    broker: brokerIdSchema,
+    scenario: scenarioIdSchema,
+  })
+  .strict();
+
+export const suiteNameSchema = z
+  .string()
+  .trim()
+  .min(SUITE_LIMITS.nameLength.min)
+  .max(SUITE_LIMITS.nameLength.max);
+
+export const suiteConfigurationSchema = z
+  .object({
+    workload: workloadConfigurationSchema,
+    combinations: z
+      .array(suiteCombinationSchema)
+      .min(SUITE_LIMITS.combinations.min)
+      .max(SUITE_LIMITS.combinations.max),
+    repetitions: boundedInteger(SUITE_LIMITS.repetitions),
+    orderStrategy: suiteOrderStrategySchema,
+    cooldownMs: boundedInteger(SUITE_LIMITS.cooldownMs),
+  })
+  .strict()
+  .superRefine(({ combinations, repetitions }, context) => {
+    const seen = new Set<string>();
+
+    combinations.forEach(({ broker, scenario }, index) => {
+      const key = `${broker}:${scenario}`;
+      if (seen.has(key)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Suite combinations must be unique.',
+          path: ['combinations', index],
+        });
+      }
+      seen.add(key);
+    });
+
+    if (combinations.length * repetitions > SUITE_LIMITS.totalRuns.max) {
+      context.addIssue({
+        code: 'custom',
+        message: `A suite cannot generate more than ${SUITE_LIMITS.totalRuns.max} runs.`,
+        path: ['repetitions'],
+      });
+    }
+  });
+
+const workloadRequestSchema = z
+  .object({
+    messageCount: workloadConfigurationFields.messageCount.default(
+      BENCHMARK_DEFAULTS.messageCount,
+    ),
+    payloadSizeBytes: workloadConfigurationFields.payloadSizeBytes.default(
+      BENCHMARK_DEFAULTS.payloadSizeBytes,
+    ),
+    producerConcurrency:
+      workloadConfigurationFields.producerConcurrency.default(
+        BENCHMARK_DEFAULTS.producerConcurrency,
+      ),
+    consumerCount: workloadConfigurationFields.consumerCount.default(
+      BENCHMARK_DEFAULTS.consumerCount,
+    ),
+    timeoutMs: workloadConfigurationFields.timeoutMs.default(
+      BENCHMARK_DEFAULTS.timeoutMs,
+    ),
+  })
+  .strict();
+
+export const createSuiteRequestSchema = z
+  .object({
+    name: suiteNameSchema,
+    workload: workloadRequestSchema.default(BENCHMARK_DEFAULTS),
+    combinations: z
+      .array(suiteCombinationSchema)
+      .min(SUITE_LIMITS.combinations.min)
+      .max(SUITE_LIMITS.combinations.max),
+    repetitions: boundedInteger(SUITE_LIMITS.repetitions).default(
+      SUITE_DEFAULTS.repetitions,
+    ),
+    orderStrategy: suiteOrderStrategySchema.default(
+      SUITE_DEFAULTS.orderStrategy,
+    ),
+    cooldownMs: boundedInteger(SUITE_LIMITS.cooldownMs).default(
+      SUITE_DEFAULTS.cooldownMs,
+    ),
+  })
+  .strict()
+  .transform(({ name, ...configuration }) => ({ name, configuration }))
+  .pipe(
+    z
+      .object({
+        name: z.string(),
+        configuration: suiteConfigurationSchema,
+      })
+      .strict(),
+  );
 
 export const startRunRequestSchema = z
   .object({
@@ -56,5 +185,13 @@ export const startRunRequestSchema = z
   .strict();
 
 export type RunConfiguration = z.infer<typeof runConfigurationSchema>;
+export type WorkloadConfiguration = z.infer<typeof workloadConfigurationSchema>;
+export type SuiteCombination = z.infer<typeof suiteCombinationSchema>;
+export type SuiteName = z.infer<typeof suiteNameSchema>;
+export type SuiteConfiguration = z.infer<typeof suiteConfigurationSchema>;
+export type CreateSuiteRequest = z.input<typeof createSuiteRequestSchema>;
+export type ResolvedCreateSuiteRequest = z.output<
+  typeof createSuiteRequestSchema
+>;
 export type StartRunRequest = z.input<typeof startRunRequestSchema>;
 export type ResolvedStartRunRequest = z.output<typeof startRunRequestSchema>;
