@@ -1,89 +1,269 @@
-# Messaging Lab — Implementation Plan
+# Messaging Lab — Product and Engineering Plan
 
-## Summary
+## Project status
 
-Messaging Lab is a local-first dashboard for comparing Redis, Kafka, and RabbitMQ through common messaging patterns and broker-native capabilities. It will use TypeScript, Node.js, React, Fastify, Docker Compose, and SQLite, and will be structured as a standalone repository ready for publication on GitHub.
+Messaging Lab has a complete local-first MVP. It can run live fan-out and competing-consumer workloads against Redis, Kafka, and RabbitMQ; stream progress; persist results in SQLite; and explain the semantic differences between the brokers.
 
-The project is educational rather than a universal performance ranking. Its documentation and interface must explain that results depend on the host machine, broker configuration, workload, and delivery semantics.
+The next phase turns the project from a collection of individual benchmark runs into a reproducible experimentation environment. The priorities are repeatability, correctness, failure behavior, and clear interpretation—not producing a universal broker ranking.
 
-## Architecture
+## Product principles
 
-- Use npm workspaces with a React/Vite frontend, a Fastify API, and a shared package for contracts, broker abstractions, and metrics.
-- Run Redis, single-node Kafka in KRaft mode, and RabbitMQ with its management interface through Docker Compose.
-- Pin broker images and application dependencies for reproducible runs.
-- Store run configuration, lifecycle state, aggregate metrics, capability notes, and errors in SQLite.
-- Stream live run progress from the API to the dashboard with Server-Sent Events (SSE).
-- Allow only one benchmark run at a time to reduce local resource contention and misleading comparisons.
+- Compare only workloads with sufficiently similar delivery semantics.
+- Keep Redis Pub/Sub separate as an ephemeral live-delivery baseline.
+- Prefer repeated measurements and distributions over single-run conclusions.
+- Record enough environment and configuration data to reproduce a result.
+- Treat message loss, duplicates, ordering, recovery, and replay as first-class outcomes.
+- Run benchmarks serially by default to reduce local resource contention.
+- Make unsupported behavior explicit instead of simulating equivalence.
+- Keep the application, code identifiers, and public documentation in English.
 
-## Messaging Scenarios
+## Phase 2 goals
 
-### Common baseline
+1. Make benchmark suites persistent and independent of the browser.
+2. Support repeated trials and statistically useful summaries.
+3. Add parameter sweeps for consumers, producers, payload size, and message count.
+4. Add controlled recovery, replay, ordering, and backpressure experiments.
+5. Improve result discovery, filtering, comparison, and export.
+6. Reduce orchestration complexity in the frontend and preserve runtime validation as contracts expand.
+7. Expand end-to-end testing, accessibility, operational documentation, and contributor guidance.
 
-- **Live fan-out:** Redis Pub/Sub, Kafka subscribers in separate consumer groups, and RabbitMQ fanout exchanges with separate queues.
-- **Competing consumers:** Redis Streams consumer groups, Kafka consumers in one consumer group, and RabbitMQ consumers sharing one queue.
+## Architecture evolution
 
-### Native capabilities
+### Persistent benchmark suites
 
-- Demonstrate retention, acknowledgements, consumer recovery, and replay where each broker supports them.
-- Present unsupported behavior explicitly instead of simulating equivalence. In particular, Redis Pub/Sub has no persistence and RabbitMQ does not provide Kafka-style arbitrary replay from a retained log.
-- Generate isolated topic, stream, exchange, and queue names for every run and clean them up afterward.
+A suite is a server-managed collection of runs. It owns the execution order and continues even if the dashboard disconnects or reloads.
 
-## Benchmark Methodology
+The suite model should include:
 
-- Accept configurable message count, payload size, producer concurrency, and consumer count.
-- Default to 10,000 messages with a 1 KB payload, one producer, and a short warm-up phase.
-- Measure total elapsed time, throughput, p50/p95/p99 end-to-end latency, published and received messages, message loss, duplicate delivery, and errors.
-- Use monotonic timestamps within the same host process for latency calculations.
-- Keep a bounded in-memory latency sample and persist only aggregate results, avoiding a database row for every message.
-- Support cancellation and enforce run timeouts so an unavailable consumer or broker cannot leave an experiment running indefinitely.
+- A unique suite identifier, name, status, and timestamps.
+- A normalized workload configuration shared by its runs.
+- The broker/scenario combinations included in the suite.
+- The repetition count, execution order strategy, and cooldown duration.
+- Ordered run references with combination and repetition indexes.
+- Progress, stop reason, and aggregate summary.
+- An environment snapshot captured when the suite starts.
 
-## Dashboard
+The API remains responsible for enforcing one active benchmark run. A suite scheduler starts the next run only after the current run reaches a terminal state and the configured cooldown has elapsed.
 
-- Show broker connectivity and health.
-- Provide controls for selecting a broker, scenario, message count, payload size, producer concurrency, and consumer count.
-- Display live status, progress, and errors while a run is active.
-- Show comparison charts, result details, historical runs, and a capability matrix explaining semantic differences.
-- Keep the interface and all public documentation in English; keep code identifiers in English as well.
+Initial order strategies:
 
-## API and Shared Contracts
+- `fixed`: deterministic order for debugging.
+- `rotating`: shift the first broker between repetitions to reduce order bias.
+- `randomized`: persist a generated order so the suite remains reproducible.
 
-- `GET /api/brokers` — return broker health and supported capabilities.
-- `POST /api/runs` — validate and start a benchmark run.
-- `GET /api/runs` — return run history with filters suitable for the dashboard.
-- `GET /api/runs/:id` — return configuration, status, metrics, notes, and errors for one run.
-- `GET /api/runs/:id/events` — stream progress and lifecycle events over SSE.
-- `POST /api/runs/:id/cancel` — request graceful cancellation of an active run.
-- Define request, response, event, scenario, broker, run-status, and metric schemas in the shared workspace package using Zod.
-- Keep broker URLs and credentials in environment variables, with working local defaults supplied by Docker Compose.
+### Suite API
 
-## Reliability and Error Handling
+Add typed shared contracts and endpoints for:
 
-- Reject a new run while another run is active with a clear conflict response.
-- Report unavailable brokers without preventing the rest of the dashboard from loading.
-- Close producers, consumers, SSE connections, and database resources during shutdown.
-- Record terminal states for completed, failed, timed-out, and cancelled runs.
-- Clean up broker resources on success, failure, timeout, and cancellation whenever the broker remains reachable.
+- `POST /api/suites` — validate, persist, and start a suite.
+- `GET /api/suites` — list suites with lightweight filters.
+- `GET /api/suites/:id` — return configuration, ordered runs, and summaries.
+- `GET /api/suites/:id/events` — stream suite and active-run progress over SSE.
+- `POST /api/suites/:id/cancel` — stop queued work and cancel the active run.
 
-## Testing and Acceptance
+Existing run endpoints remain available for individual experiments and run details.
 
-- Unit-test request validation, metric aggregation, percentile calculations, lifecycle transitions, and capability mappings.
-- Integration-test every broker adapter against its real Docker service for publishing, consuming, fan-out, competing consumers, acknowledgements, and supported replay.
-- Verify unavailable-broker, timeout, cancellation, restart, duplicate-delivery, and cleanup paths.
-- Test API endpoints and SSE event delivery.
-- Test the dashboard's main loading, empty, running, success, and failure states.
-- Add a smoke test proving that `docker compose up --build` starts the stack and that a default experiment completes.
-- Configure CI to run linting, type checking, unit tests, production builds, and Docker-backed integration tests.
+### Persistence
 
-## Repository Deliverables
+Extend SQLite with versioned migrations and tables for:
 
-- Initialize this folder as an independent Git repository.
-- Add `.gitignore`, `.env.example`, formatting and linting configuration, an MIT license, and GitHub Actions workflows.
-- Write an English README covering architecture, messaging semantics, prerequisites, commands, methodology, limitations, interpretation guidance, and screenshots.
-- Prepare the repository for GitHub, but do not create or push a remote repository as part of the initial implementation.
+- Suites and their lifecycle state.
+- Ordered suite-run membership.
+- Environment snapshots.
+- Aggregate suite summaries when caching them is useful.
 
-## Assumptions
+Suite recovery on API startup must be explicit. An interrupted active run becomes failed, while its suite becomes stopped with a recorded reason. Automatic continuation after process restart is out of scope initially because it could produce misleading results under changed host conditions.
 
-- The application is for local use and requires no authentication or cloud deployment.
-- Docker Compose is the supported way to run the complete stack.
-- Fastify is used to keep the API small and typed while providing structured validation, lifecycle hooks, and straightforward SSE support.
-- SQLite is sufficient because benchmarks run serially and results are local.
+### Frontend orchestration
+
+Move suite scheduling out of `App` and into the API. The frontend should only create, observe, cancel, and display suites.
+
+Split application behavior into focused hooks or controllers:
+
+- Initial dashboard loading and refresh.
+- Individual run lifecycle and SSE subscription.
+- Suite lifecycle and progress subscription.
+- Run and suite selection.
+
+Keep result grouping and statistical summaries in pure functions so they can be tested without rendering React components.
+
+### Runtime contract validation
+
+The current API client validates successful responses and SSE events with the
+shared Zod schemas. New suite, sweep, and experiment contracts must follow the
+same boundary-validation pattern. Improve structured client errors so the UI
+can distinguish validation, connectivity, conflict, timeout, and broker
+failures without weakening existing parsing.
+
+## Experiment roadmap
+
+### Repeated trials
+
+The first suite version runs a fixed workload multiple times for each selected broker/scenario combination.
+
+Display:
+
+- Median throughput and p50/p95/p99 latency.
+- Minimum and maximum.
+- Interquartile range or another clearly documented spread measure.
+- Loss, duplicates, errors, and successful trial count.
+- Individual trials behind the aggregate summary.
+
+Do not silently exclude failed trials. Show how many succeeded and preserve every terminal result.
+
+### Parameter sweeps
+
+Build on suites to vary one dimension at a time:
+
+- Consumer count.
+- Producer count.
+- Payload size.
+- Message count.
+
+The UI should plot curves instead of ranking unrelated points in a bar chart. Sweep limits must prevent accidental creation of impractically large local workloads.
+
+### Recovery and replay
+
+Add broker-native experiments that intentionally interrupt consumers and then observe recovery:
+
+- Redis Streams pending-message claim and retained-message replay.
+- Kafka committed-offset recovery and explicit offset reset.
+- RabbitMQ unacknowledged-message redelivery without claiming retained-log replay.
+- Redis Pub/Sub subscriber absence as an explicit message-loss demonstration.
+
+Record recovery duration, redelivered messages, duplicates, loss, and unsupported capabilities.
+
+### Ordering and backpressure
+
+Add sequence metadata to messages and measure ordering violations globally and within the broker's ordering scope. Allow a configurable consumer delay to demonstrate backlog growth and latency under slow consumption.
+
+Expose broker-native backlog indicators only when their meanings are documented and not presented as interchangeable values.
+
+### Fault injection boundary
+
+Begin with application-controlled consumer interruption and delay. Broker restarts, network latency, and packet loss require privileged Docker control and should be a later, opt-in mode with prominent safety and environment requirements.
+
+## Result experience
+
+### Comparability
+
+Keep these result areas distinct:
+
+- Durable fan-out: Kafka and RabbitMQ.
+- Durable competing consumers: Redis Streams, Kafka, and RabbitMQ.
+- Ephemeral live baseline: Redis Pub/Sub only.
+- Broker-native recovery and replay demonstrations.
+
+Comparisons should use the latest selected suite or an explicit user selection, never an unexplained slice of history.
+
+### History and analysis
+
+Add:
+
+- Filters for broker, scenario, status, suite, and date.
+- Named experiments and optional descriptions.
+- Manual comparison of compatible runs or suites.
+- Saved workload presets.
+- JSON and CSV export.
+- Explicit deletion of selected local history.
+- Stable URLs for run and suite selection.
+
+### Environment provenance
+
+Capture information that materially affects interpretation:
+
+- Messaging Lab version and commit when available.
+- Broker image and version.
+- Workload and adapter configuration.
+- Operating system, CPU architecture, and logical CPU count.
+- Node.js version.
+- Optional memory information.
+
+Avoid collecting personal identifiers or unrelated host information.
+
+## Code quality plan
+
+- Extract run and suite orchestration from the top-level React component.
+- Split broad frontend tests into component and workflow test files.
+- Extract typed row-mapping helpers from the SQLite repository.
+- Centralize repeated adapter utilities only where broker semantics remain visible.
+- Organize CSS into tokens, layout, and component files when the current stylesheet becomes difficult to navigate.
+- Add migration infrastructure before changing the persisted schema.
+- Prefer small pure selectors for grouping, latest-result selection, and statistics.
+- Keep cancellation, timeout, cleanup, and shutdown behavior idempotent.
+
+Avoid a generic broker superclass. The adapters intentionally expose different delivery and recovery behavior, and excessive abstraction would hide the main subject of the project.
+
+## Testing strategy
+
+### Unit and component tests
+
+- Suite lifecycle, scheduling, order strategies, and cancellation.
+- Statistical summaries and incomplete-trial handling.
+- Parameter sweep expansion and safety limits.
+- Runtime API and SSE validation.
+- Comparison-group selectors and filters.
+- Database migrations and row mapping.
+- Accessibility checks for forms, progress, tables, and charts.
+
+### Integration tests
+
+- Persistent suites against real Docker brokers.
+- Consumer interruption, recovery, replay, and redelivery.
+- Ordering and slow-consumer behavior.
+- Cleanup after every terminal state.
+- API restart while a suite is active.
+
+### End-to-end tests
+
+Use a browser test for the critical path from suite creation to aggregate results. Cover reload during an active suite, SSE reconnection, cancellation, filtering, and export.
+
+Performance assertions in CI should focus on correctness and broad sanity checks. Do not enforce narrow absolute throughput or latency thresholds on shared runners.
+
+## Documentation plan
+
+- Update the README as user-visible capabilities ship.
+- Add experiment recipes with expected observations, not expected rankings.
+- Add a result-interpretation guide covering distributions and semantic limits.
+- Add troubleshooting for Docker, ports, broker startup, and orphaned resources.
+- Add a messaging glossary.
+- Add contributing and release guidance.
+- Record important architectural decisions as short ADRs.
+- Keep diagrams, screenshots, API documentation, and environment variables synchronized with the implementation.
+
+## Delivery milestones
+
+### Milestone A — Maintainable orchestration
+
+Refactor frontend lifecycle handling, preserve runtime validation for new
+contracts, improve structured client errors, split tests, and introduce
+database migrations.
+
+### Milestone B — Reproducible suites
+
+Persist suites, schedule them in the API, survive browser reloads, support cancellation, and group their runs in the UI.
+
+### Milestone C — Repeated evidence
+
+Add repetitions, order strategies, cooldowns, environment snapshots, aggregate statistics, and suite export.
+
+### Milestone D — Scaling experiments
+
+Add safe one-dimensional parameter sweeps and curve visualizations.
+
+### Milestone E — Behavior under stress
+
+Add recovery, replay, ordering, and backpressure experiments with broker-specific explanations.
+
+### Milestone F — Publication quality
+
+Complete browser E2E coverage, accessibility review, contributor documentation, troubleshooting, ADRs, and updated screenshots.
+
+## Non-goals for this phase
+
+- Universal broker rankings.
+- Distributed load generation across multiple hosts.
+- Production capacity planning or service-level guarantees.
+- Cloud deployment, authentication, or multi-user collaboration.
+- Automatic privileged fault injection by default.
+- Hiding broker-specific behavior behind a falsely uniform abstraction.

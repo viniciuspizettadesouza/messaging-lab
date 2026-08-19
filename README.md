@@ -19,6 +19,12 @@ This project is an educational lab, not a universal broker ranking. Results desc
 - Keep aggregate run history in SQLite across application restarts.
 - See where persistence, acknowledgements, recovery, and replay are genuinely supported.
 
+The current “Run all 6 sequentially” action is coordinated by the browser. It
+starts one ordinary run after another, and each result is persisted separately.
+Reloading or closing the dashboard stops the remaining browser queue, although
+the active API run continues. Persistent suites, repetitions, and aggregate
+statistics are planned but are not implemented yet.
+
 ## Quick start
 
 ### Prerequisites
@@ -64,6 +70,10 @@ flowchart LR
 | `scripts`         | Docker Compose wrapper and isolated full-stack smoke verification      |
 
 The API permits one active run at a time. Every run receives isolated broker resource names; completion, cancellation, timeout, and failure all enter the cleanup path.
+
+The dashboard can queue all six broker/pattern combinations, but that queue is
+currently frontend state rather than an API resource. See the architecture
+document for the current execution flow and its limitations.
 
 More detail and messaging-flow diagrams are in [architecture](docs/architecture.md).
 

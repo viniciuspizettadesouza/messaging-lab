@@ -31,6 +31,32 @@ flowchart TB
 
 The shared workspace owns the Zod schemas consumed by both applications. API responses and incoming SSE events are validated at the web boundary.
 
+## Current sequential runner
+
+The dashboard's “Run all 6 sequentially” action is a client-side convenience.
+It expands the selected workload into the six broker/scenario combinations and
+submits one ordinary run at a time.
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant API
+    participant Broker
+
+    loop Six broker/scenario combinations
+      Browser->>API: POST /api/runs
+      API->>Broker: Execute isolated benchmark
+      API-->>Browser: SSE progress and terminal status
+      Browser->>API: POST the next run
+    end
+```
+
+The queue exists only in browser memory. Reloading or closing the page discards
+the remaining queue, while an already active API run continues and can be
+rediscovered from run history. Runs are persisted individually: there is no
+suite identifier, repetition model, aggregate suite result, or server-side
+queue yet.
+
 ## Run lifecycle
 
 ```mermaid
