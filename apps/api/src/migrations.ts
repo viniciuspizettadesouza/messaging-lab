@@ -106,6 +106,16 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX suite_errors_suite_id_idx ON suite_errors (suite_id, id);
     `,
   },
+  {
+    version: 3,
+    name: 'suite environment snapshots',
+    sql: `
+      CREATE TABLE suite_environment_snapshots (
+        suite_id TEXT PRIMARY KEY REFERENCES suites(id) ON DELETE CASCADE,
+        snapshot_json TEXT NOT NULL CHECK (json_valid(snapshot_json))
+      ) STRICT;
+    `,
+  },
 ];
 
 export function migrateDatabase(database: DatabaseSync): void {

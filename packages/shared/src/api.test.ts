@@ -93,6 +93,38 @@ describe('suite schemas', () => {
         progress,
         summary,
         combinationSummaries: [],
+        environment: {
+          capturedAt: timestamp,
+          application: { version: '0.1.0', commit: null },
+          runtime: { nodeVersion: 'v22.18.0' },
+          host: {
+            platform: 'linux',
+            release: '6.0',
+            architecture: 'x64',
+            logicalCpuCount: 8,
+            totalMemoryBytes: null,
+          },
+          brokers: {
+            redis: { image: 'redis:8.2.1', version: '8.2.1' },
+            kafka: { image: 'apache/kafka:4.0.0', version: '4.0.0' },
+            rabbitmq: { image: null, version: null },
+          },
+          adapterConfiguration: {
+            redis: { transport: 'tcp', client: 'redis@6.2.1' },
+            kafka: {
+              transport: 'tcp',
+              client: 'kafkajs@2.2.4',
+              brokerCount: 1,
+              producerAcknowledgements: 'all',
+              automaticTopicCreation: false,
+            },
+            rabbitmq: {
+              transport: 'tcp',
+              client: 'amqplib@2.0.1',
+              prefetch: 100,
+            },
+          },
+        },
         createdAt: timestamp,
         startedAt: timestamp,
         finishedAt: null,

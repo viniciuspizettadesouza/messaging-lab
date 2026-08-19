@@ -201,6 +201,68 @@ export const suiteRunSchema = z
   })
   .strict();
 
+const brokerEnvironmentSchema = z
+  .object({
+    image: z.string().min(1).nullable(),
+    version: z.string().min(1).nullable(),
+  })
+  .strict();
+
+export const environmentSnapshotSchema = z
+  .object({
+    capturedAt: isoTimestampSchema,
+    application: z
+      .object({
+        version: z.string().min(1),
+        commit: z.string().min(1).nullable(),
+      })
+      .strict(),
+    runtime: z.object({ nodeVersion: z.string().min(1) }).strict(),
+    host: z
+      .object({
+        platform: z.string().min(1),
+        release: z.string().min(1),
+        architecture: z.string().min(1),
+        logicalCpuCount: z.number().int().positive(),
+        totalMemoryBytes: z.number().int().positive().nullable(),
+      })
+      .strict(),
+    brokers: z
+      .object({
+        redis: brokerEnvironmentSchema,
+        kafka: brokerEnvironmentSchema,
+        rabbitmq: brokerEnvironmentSchema,
+      })
+      .strict(),
+    adapterConfiguration: z
+      .object({
+        redis: z
+          .object({
+            transport: z.enum(['tcp', 'tls']),
+            client: z.string().min(1),
+          })
+          .strict(),
+        kafka: z
+          .object({
+            transport: z.enum(['tcp', 'tls']),
+            client: z.string().min(1),
+            brokerCount: z.number().int().positive(),
+            producerAcknowledgements: z.literal('all'),
+            automaticTopicCreation: z.literal(false),
+          })
+          .strict(),
+        rabbitmq: z
+          .object({
+            transport: z.enum(['tcp', 'tls']),
+            client: z.string().min(1),
+            prefetch: z.number().int().positive(),
+          })
+          .strict(),
+      })
+      .strict(),
+  })
+  .strict();
+
 export const suiteSchema = z
   .object({
     id: suiteIdSchema,
@@ -210,6 +272,7 @@ export const suiteSchema = z
     progress: suiteProgressSchema,
     summary: suiteSummarySchema,
     combinationSummaries: z.array(suiteCombinationSummarySchema),
+    environment: environmentSnapshotSchema.nullable(),
     createdAt: isoTimestampSchema,
     startedAt: isoTimestampSchema.nullable(),
     finishedAt: isoTimestampSchema.nullable(),
@@ -432,6 +495,7 @@ export type SuiteCombinationSummary = z.infer<
   typeof suiteCombinationSummarySchema
 >;
 export type SuiteRun = z.infer<typeof suiteRunSchema>;
+export type EnvironmentSnapshot = z.infer<typeof environmentSnapshotSchema>;
 export type Suite = z.infer<typeof suiteSchema>;
 export type SuiteEvent = z.infer<typeof suiteEventSchema>;
 export type SuiteResponse = z.infer<typeof suiteResponseSchema>;

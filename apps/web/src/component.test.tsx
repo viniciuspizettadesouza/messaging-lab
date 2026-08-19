@@ -160,6 +160,24 @@ describe('dashboard components', () => {
     );
   });
 
+  it('shows the resolved workload and privacy-conscious environment provenance', async () => {
+    render(
+      <SuiteDetail
+        suite={createSuite('completed', ['completed', 'completed'])}
+        disconnected={false}
+        onCancel={vi.fn()}
+        onSelectRun={vi.fn()}
+      />,
+    );
+    await userEvent.click(screen.getByText('Environment and reproducibility'));
+
+    expect(screen.getByText('0.1.0-test')).toBeInTheDocument();
+    expect(screen.getByText('abc1234')).toBeInTheDocument();
+    expect(screen.getByText('redis:8.2.1-alpine3.22')).toBeInTheDocument();
+    expect(screen.queryByText('rotating')).not.toBeInTheDocument();
+    expect(screen.getByText('fixed')).toBeInTheDocument();
+  });
+
   it('groups suite runs and supports arrow-key history navigation', async () => {
     const suite = createSuite('completed', ['completed', 'failed']);
     const standalone = {

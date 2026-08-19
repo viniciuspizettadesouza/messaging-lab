@@ -16,6 +16,7 @@ import { RunEventStore } from './run-events.js';
 import { RunManager } from './run-manager.js';
 import { SuiteEventStore } from './suite-events.js';
 import { buildSuiteExecutionOrder, SuiteScheduler } from './suite-scheduler.js';
+import { testEnvironmentSnapshot } from '../test-environment.test-helper.js';
 
 const configuration: SuiteConfiguration = {
   workload: { ...BENCHMARK_DEFAULTS, messageCount: 1 },
@@ -177,6 +178,7 @@ function createScheduler(
     runManager,
     runEvents,
     suiteEvents,
+    () => testEnvironmentSnapshot,
     Math.random,
     delay,
   );

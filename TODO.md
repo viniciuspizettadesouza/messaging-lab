@@ -76,13 +76,13 @@ This checklist continues from the completed MVP. Items are ordered by dependency
 
 ## 14. Environment provenance and reproducibility
 
-- [ ] Define a privacy-conscious environment snapshot contract.
-- [ ] Capture application version, Node.js version, OS, architecture, and logical CPU count.
-- [ ] Capture broker image tags and broker versions when available.
-- [ ] Persist the resolved workload, adapter configuration, order, and cooldown.
-- [ ] Display provenance alongside suite results.
-- [ ] Include provenance in JSON and CSV exports.
-- [ ] Document which host factors can invalidate comparisons between suites.
+- [x] Define a privacy-conscious environment snapshot contract.
+- [x] Capture application version, Node.js version, OS, architecture, and logical CPU count.
+- [x] Capture broker image tags and broker versions when available.
+- [x] Persist the resolved workload, adapter configuration, order, and cooldown.
+- [x] Display provenance alongside suite results.
+- [x] Include provenance in JSON and CSV exports.
+- [x] Document which host factors can invalidate comparisons between suites.
 
 ## 15. History, filtering, and manual comparison
 

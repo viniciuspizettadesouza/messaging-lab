@@ -3,6 +3,7 @@ import type {
   Suite,
   SuiteConfiguration,
   SuiteError,
+  EnvironmentSnapshot,
 } from '@messaging-lab/shared';
 
 import { ApiError } from '../errors.js';
@@ -35,6 +36,7 @@ class SuiteStoppedError extends Error {
 }
 
 type Delay = (milliseconds: number, signal: AbortSignal) => Promise<void>;
+type CaptureEnvironment = () => EnvironmentSnapshot;
 
 export class SuiteScheduler {
   private activeSuite: ActiveSuite | null = null;
@@ -44,6 +46,7 @@ export class SuiteScheduler {
     private readonly runManager: RunManager,
     private readonly runEvents: RunEventStore,
     private readonly events: SuiteEventStore,
+    private readonly captureEnvironment: CaptureEnvironment,
     private readonly random: () => number = Math.random,
     private readonly delay: Delay = abortableDelay,
   ) {}
@@ -71,6 +74,7 @@ export class SuiteScheduler {
       request.name,
       request.configuration,
       order,
+      this.captureEnvironment(),
     );
     const controller = new AbortController();
     const completion = Promise.resolve().then(() =>

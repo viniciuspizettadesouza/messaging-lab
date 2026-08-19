@@ -93,6 +93,24 @@ consumers; recovery experiments will populate that measure.
 - The bounded latency sample is representative rather than exhaustive above 10,000 deliveries.
 - One warm-up reduces obvious startup effects but does not establish statistical stability.
 
+## Comparing environments
+
+Every new suite captures a privacy-conscious environment snapshot at creation.
+It includes application and runtime versions, OS release and architecture,
+logical CPU count, optional total memory, configured broker images/versions,
+and sanitized adapter behavior. It never records hostnames, usernames,
+filesystem paths, broker addresses, or credentials. The resolved workload,
+repetition count, order strategy, cooldown, and complete generated order are
+persisted separately as part of the suite.
+
+Treat suites from different environments as non-equivalent when they differ in
+broker or client versions, CPU architecture/count, available memory, OS/runtime
+version, Docker resource limits, power mode, or background host load. Even
+matching snapshots do not prove identical conditions: CPU model, storage,
+thermal throttling, virtualization, kernel tuning, and concurrent processes are
+intentionally not collected. Re-run suites under controlled conditions rather
+than normalizing across materially different hosts.
+
 ## Responsible interpretation
 
 1. Decide which delivery guarantees the application requires before comparing speed.

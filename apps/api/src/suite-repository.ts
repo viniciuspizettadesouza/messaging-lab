@@ -4,6 +4,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import {
   suiteConfigurationSchema,
   suiteErrorSchema,
+  environmentSnapshotSchema,
   suiteNameSchema,
   suiteRunSchema,
   suiteSchema,
@@ -13,6 +14,7 @@ import {
   type SuiteCombination,
   type SuiteConfiguration,
   type SuiteError,
+  type EnvironmentSnapshot,
   type SuiteStatus,
 } from '@messaging-lab/shared';
 
@@ -64,6 +66,10 @@ interface SuiteErrorRow {
   readonly details_json: string | null;
 }
 
+interface EnvironmentRow {
+  readonly snapshot_json: string;
+}
+
 const TERMINAL_SUITE_STATUSES = new Set<SuiteStatus>([
   'completed',
   'failed',
@@ -89,9 +95,11 @@ export class SuiteRepository {
     name: string,
     configuration: SuiteConfiguration,
     executionOrder: readonly SuiteExecutionItem[],
+    environment: EnvironmentSnapshot,
   ): Suite {
     const parsedConfiguration = suiteConfigurationSchema.parse(configuration);
     const parsedName = suiteNameSchema.parse(name);
+    const parsedEnvironment = environmentSnapshotSchema.parse(environment);
     validateExecutionOrder(parsedConfiguration, executionOrder);
 
     const id = this.createId();
@@ -120,6 +128,12 @@ export class SuiteRepository {
           item.combination.scenario,
         );
       }
+      this.database
+        .prepare(
+          `INSERT INTO suite_environment_snapshots (suite_id, snapshot_json)
+           VALUES (?, ?)`,
+        )
+        .run(id, JSON.stringify(parsedEnvironment));
       this.database.exec('COMMIT;');
     } catch (error) {
       this.database.exec('ROLLBACK;');
@@ -281,6 +295,11 @@ export class SuiteRepository {
          FROM suite_errors WHERE suite_id = ? ORDER BY id`,
       )
       .all(row.id) as unknown as SuiteErrorRow[];
+    const environmentRow = this.database
+      .prepare(
+        'SELECT snapshot_json FROM suite_environment_snapshots WHERE suite_id = ?',
+      )
+      .get(row.id) as EnvironmentRow | undefined;
     const suiteRuns = itemRows.map((item) =>
       suiteRunSchema.parse({
         position: item.position,
@@ -332,6 +351,11 @@ export class SuiteRepository {
         configuration.combinations,
         suiteRuns,
       ),
+      environment: environmentRow
+        ? environmentSnapshotSchema.parse(
+            JSON.parse(environmentRow.snapshot_json),
+          )
+        : null,
       createdAt: row.created_at,
       startedAt: row.started_at,
       finishedAt: row.finished_at,

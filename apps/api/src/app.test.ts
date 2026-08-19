@@ -21,6 +21,7 @@ import type { ApiConfig } from './config.js';
 import { openDatabase } from './database.js';
 import { RunRepository } from './run-repository.js';
 import { SuiteRepository } from './suite-repository.js';
+import { testEnvironmentSnapshot } from './test-environment.test-helper.js';
 
 const config: ApiConfig = {
   nodeEnv: 'test',
@@ -270,6 +271,13 @@ describe('API', () => {
         }),
       ]),
     );
+    expect(completed.environment).toMatchObject({
+      application: { version: '0.1.0' },
+      host: { logicalCpuCount: expect.any(Number) },
+      brokers: {
+        redis: { image: 'redis:8.2.1-alpine3.22', version: '8.2.1' },
+      },
+    });
 
     const jsonExport = await application.app.inject({
       method: 'GET',
@@ -283,6 +291,8 @@ describe('API', () => {
     expect(suiteResponseSchema.parse(jsonExport.json()).runs).toHaveLength(2);
     expect(csvExport.headers['content-type']).toContain('text/csv');
     expect(csvExport.body).toContain('throughput_messages_per_second');
+    expect(csvExport.body).toContain('environment_captured_at');
+    expect(csvExport.body).toContain('redis:8.2.1-alpine3.22');
     expect(csvExport.body.split('\n')).toHaveLength(4);
 
     const eventResponse = await application.app.inject({
@@ -410,14 +420,19 @@ describe('API', () => {
       orderStrategy: 'fixed',
       cooldownMs: 0,
     };
-    const interrupted = suites.create('Interrupted', configuration, [
-      {
-        position: 0,
-        combinationIndex: 0,
-        repetition: 1,
-        combination: configuration.combinations[0]!,
-      },
-    ]);
+    const interrupted = suites.create(
+      'Interrupted',
+      configuration,
+      [
+        {
+          position: 0,
+          combinationIndex: 0,
+          repetition: 1,
+          combination: configuration.combinations[0]!,
+        },
+      ],
+      testEnvironmentSnapshot,
+    );
     const adapter = new ImmediateAdapter();
     application = createApplication({
       config,

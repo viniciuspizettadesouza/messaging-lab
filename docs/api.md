@@ -126,12 +126,18 @@ contains success/failure counts, five-number throughput and p50/p95/p99 latency
 distributions, IQR, and aggregate delivery anomalies for each configured
 broker/scenario combination.
 
+The response also includes an immutable `environment` snapshot captured when
+the suite is created. It records the application version and optional commit,
+Node.js version, OS/release/architecture, logical CPU count, optional total
+memory, broker images and inferred versions, and sanitized adapter settings.
+Legacy suites created before this contract return `environment: null`.
+
 ### `GET /api/suites/:id/export?format=json|csv`
 
 Downloads the suite and all underlying trials. JSON uses the same validated
 suite contract as the detail endpoint. CSV emits one row per ordered trial,
 including queued and unsuccessful trials, configuration identity, lifecycle
-timestamps, metrics, anomaly counts, and errors.
+timestamps, metrics, anomaly counts, errors, and environment provenance.
 
 ### `POST /api/suites/:id/cancel`
 
@@ -176,12 +182,17 @@ Copy `.env.example` to `.env` for local overrides. The included credentials are 
 | `API_PORT`                 | `3000`                                      | API/Compose | API host port                             |
 | `WEB_PORT`                 | `5173`                                      | Compose     | Dashboard host port                       |
 | `DATABASE_URL`             | `./data/messaging-lab.sqlite`               | API         | SQLite file or `:memory:` in tests        |
+| `MESSAGING_LAB_VERSION`    | `0.1.0`                                     | API         | Version stored in suite provenance        |
+| `MESSAGING_LAB_COMMIT`     | empty                                       | API         | Optional commit stored in provenance      |
 | `REDIS_PORT`               | `6379`                                      | Compose     | Redis host port                           |
+| `REDIS_IMAGE`              | `redis:8.2.1-alpine3.22`                    | API/Compose | Redis image and provenance                |
 | `REDIS_PASSWORD`           | `messaging`                                 | Compose     | Local Redis password                      |
 | `REDIS_URL`                | `redis://:messaging@localhost:6379`         | API         | Redis connection URL                      |
 | `KAFKA_PORT`               | `9092`                                      | Compose     | Kafka host port and advertised listener   |
+| `KAFKA_IMAGE`              | `apache/kafka:4.0.0`                        | API/Compose | Kafka image and provenance                |
 | `KAFKA_BROKERS`            | `localhost:9092`                            | API         | Comma-separated Kafka `host:port` entries |
 | `RABBITMQ_PORT`            | `5672`                                      | Compose     | AMQP host port                            |
+| `RABBITMQ_IMAGE`           | `rabbitmq:4.1.3-management-alpine`          | API/Compose | RabbitMQ image and provenance             |
 | `RABBITMQ_MANAGEMENT_PORT` | `15672`                                     | Compose     | RabbitMQ management host port             |
 | `RABBITMQ_USER`            | `messaging`                                 | Compose     | Local RabbitMQ user                       |
 | `RABBITMQ_PASSWORD`        | `messaging`                                 | Compose     | Local RabbitMQ password                   |

@@ -21,12 +21,16 @@ This project is an educational lab, not a universal broker ranking. Results desc
 - Restore active suites after reload and inspect their ordered trials and failures.
 - Compare repeated trials with medians, quartiles, ranges, anomaly totals, and low-sample warnings.
 - Export every suite and its underlying trials as JSON or CSV.
+- Inspect and export privacy-conscious environment provenance for reproducibility.
 - See where persistence, acknowledgements, recovery, and replay are genuinely supported.
 
 Suites are coordinated and persisted by the API, not the browser. They continue
 if the dashboard reloads or disconnects, retain their complete execution order,
 and keep failed, timed-out, and cancelled trials visible. Distribution-aware
 aggregate statistics use successful trials without hiding unsuccessful ones.
+At creation, each new suite also records application/runtime versions, safe host
+characteristics, broker images, and sanitized adapter settings without storing
+hostnames, paths, endpoints, or credentials.
 
 ## Quick start
 

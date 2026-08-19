@@ -120,6 +120,8 @@ export function SuiteDetail({
         </a>
       </div>
 
+      <Provenance suite={suite} />
+
       {suite.stopReason ? (
         <div className="state-notice">
           <strong>{suite.stopReason}</strong>
@@ -186,6 +188,138 @@ export function SuiteDetail({
       </div>
     </section>
   );
+}
+
+function Provenance({ suite }: { readonly suite: Suite }) {
+  const environment = suite.environment;
+  return (
+    <details className="suite-provenance">
+      <summary>Environment and reproducibility</summary>
+      <div className="provenance-content">
+        <h3>Resolved workload</h3>
+        <dl className="provenance-grid">
+          <Definition
+            label="Messages"
+            value={suite.configuration.workload.messageCount}
+          />
+          <Definition
+            label="Payload bytes"
+            value={suite.configuration.workload.payloadSizeBytes}
+          />
+          <Definition
+            label="Producers"
+            value={suite.configuration.workload.producerConcurrency}
+          />
+          <Definition
+            label="Consumers"
+            value={suite.configuration.workload.consumerCount}
+          />
+          <Definition
+            label="Timeout"
+            value={`${suite.configuration.workload.timeoutMs} ms`}
+          />
+          <Definition
+            label="Repetitions"
+            value={suite.configuration.repetitions}
+          />
+          <Definition label="Order" value={suite.configuration.orderStrategy} />
+          <Definition
+            label="Cooldown"
+            value={`${suite.configuration.cooldownMs} ms`}
+          />
+        </dl>
+        {!environment ? (
+          <p className="muted provenance-unavailable">
+            Environment provenance was not recorded for this legacy suite.
+          </p>
+        ) : (
+          <>
+            <h3>Host and runtime</h3>
+            <dl className="provenance-grid">
+              <Definition
+                label="Application"
+                value={environment.application.version}
+              />
+              <Definition
+                label="Commit"
+                value={environment.application.commit ?? 'Not available'}
+              />
+              <Definition
+                label="Node.js"
+                value={environment.runtime.nodeVersion}
+              />
+              <Definition
+                label="Operating system"
+                value={`${environment.host.platform} ${environment.host.release}`}
+              />
+              <Definition
+                label="Architecture"
+                value={environment.host.architecture}
+              />
+              <Definition
+                label="Logical CPUs"
+                value={environment.host.logicalCpuCount}
+              />
+              <Definition
+                label="Memory"
+                value={
+                  environment.host.totalMemoryBytes
+                    ? formatBytes(environment.host.totalMemoryBytes)
+                    : 'Not available'
+                }
+              />
+              <Definition
+                label="Captured"
+                value={formatDate(environment.capturedAt)}
+              />
+            </dl>
+            <h3>Broker and adapter versions</h3>
+            <ul className="provenance-brokers">
+              {[
+                ...new Set(
+                  suite.configuration.combinations.map(({ broker }) => broker),
+                ),
+              ].map((broker) => {
+                const brokerEnvironment = environment.brokers[broker];
+                const adapter = environment.adapterConfiguration[broker];
+                return (
+                  <li key={broker}>
+                    <strong>{BROKER_LABELS[broker]}</strong>
+                    <span>
+                      {brokerEnvironment.image ?? 'Image not available'}
+                    </span>
+                    <small>
+                      broker {brokerEnvironment.version ?? 'unknown'} ·{' '}
+                      {adapter.client} · {adapter.transport}
+                    </small>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
+      </div>
+    </details>
+  );
+}
+
+function Definition({
+  label,
+  value,
+}: {
+  readonly label: string;
+  readonly value: string | number;
+}) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function formatBytes(bytes: number): string {
+  return `${formatNumber(bytes / 1024 ** 3, 1)} GiB`;
 }
 
 function CombinationAggregate({

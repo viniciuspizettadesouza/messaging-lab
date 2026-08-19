@@ -171,8 +171,9 @@ One consumer handles each message. Distribution depends on consumer readiness, b
 
 ## Persistence model
 
-SQLite stores run state plus suite configuration, lifecycle, errors, and ordered
-suite-run membership. Versioned, transactional migrations advance `user_version`
+SQLite stores run state plus suite configuration, lifecycle, errors, ordered
+suite-run membership, and an immutable privacy-conscious environment snapshot.
+Versioned, transactional migrations advance `user_version`
 before repositories access the database; a database from a newer application
 version is rejected. Typed row mappers translate storage columns into the
 shared runtime-validated domain model. Individual message timings are

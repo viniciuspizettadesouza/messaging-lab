@@ -37,6 +37,7 @@ import { ApiError } from './errors.js';
 import { RunRepository } from './run-repository.js';
 import { SuiteRepository } from './suite-repository.js';
 import { serializeSuiteCsv } from './suite-export.js';
+import { captureEnvironmentSnapshot } from './environment-snapshot.js';
 
 export interface Application {
   readonly app: FastifyInstance;
@@ -75,6 +76,7 @@ export function createApplication(
     runManager,
     events,
     suiteEvents,
+    () => captureEnvironmentSnapshot(config),
   );
   const brokerHealthChecker =
     options.brokerHealthChecker ??

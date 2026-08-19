@@ -26,12 +26,28 @@ const CSV_COLUMNS = [
   'redelivered_messages',
   'error_count',
   'errors',
+  'environment_captured_at',
+  'application_version',
+  'application_commit',
+  'node_version',
+  'os_platform',
+  'os_release',
+  'architecture',
+  'logical_cpu_count',
+  'total_memory_bytes',
+  'broker_image',
+  'broker_version',
+  'adapter_configuration',
 ] as const;
 
 export function serializeSuiteCsv(suite: Suite): string {
   const rows = suite.runs.map((trial) => {
     const run = trial.run;
     const metrics = run?.metrics;
+    const environment = suite.environment;
+    const brokerEnvironment = environment?.brokers[trial.combination.broker];
+    const adapterConfiguration =
+      environment?.adapterConfiguration[trial.combination.broker];
     return [
       suite.id,
       suite.name,
@@ -60,6 +76,18 @@ export function serializeSuiteCsv(suite: Suite): string {
       run?.errors
         .map(({ code, message }) => `${code}: ${message}`)
         .join(' | ') ?? '',
+      environment?.capturedAt ?? '',
+      environment?.application.version ?? '',
+      environment?.application.commit ?? '',
+      environment?.runtime.nodeVersion ?? '',
+      environment?.host.platform ?? '',
+      environment?.host.release ?? '',
+      environment?.host.architecture ?? '',
+      environment?.host.logicalCpuCount ?? '',
+      environment?.host.totalMemoryBytes ?? '',
+      brokerEnvironment?.image ?? '',
+      brokerEnvironment?.version ?? '',
+      adapterConfiguration ? JSON.stringify(adapterConfiguration) : '',
     ];
   });
   return [CSV_COLUMNS, ...rows]
