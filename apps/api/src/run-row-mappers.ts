@@ -8,6 +8,8 @@ import {
 
 export interface RunRow {
   id: string;
+  name: string | null;
+  description: string | null;
   broker: BrokerId;
   scenario: RunConfiguration['scenario'];
   message_count: number;
@@ -53,6 +55,8 @@ export function mapRunRows(
 ): Run {
   return runSchema.parse({
     id: row.id,
+    name: row.name,
+    description: row.description,
     configuration: {
       broker: row.broker,
       scenario: row.scenario,

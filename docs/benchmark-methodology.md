@@ -120,4 +120,11 @@ than normalizing across materially different hosts.
 5. Record software versions and machine specifications when sharing results.
 6. Reproduce the intended production topology and tuning before making an architecture decision.
 
+Manual dashboard comparisons preserve the same semantic boundaries as the
+default charts. Redis Pub/Sub fan-out is isolated as an ephemeral live
+baseline, Kafka and RabbitMQ fan-out form the durable fan-out group, and Redis
+Streams, Kafka, and RabbitMQ form the durable competing-consumer group. A
+selection spanning these boundaries is displayed as separate groups rather
+than rejected or ranked together.
+
 Messaging Lab is best used to learn how semantics affect observable behavior and to form hypotheses for application-specific testing.

@@ -75,6 +75,7 @@ export class SuiteScheduler {
       request.configuration,
       order,
       this.captureEnvironment(),
+      request.description,
     );
     const controller = new AbortController();
     const completion = Promise.resolve().then(() =>

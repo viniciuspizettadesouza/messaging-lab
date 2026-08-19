@@ -3,6 +3,7 @@ import type { Suite } from '@messaging-lab/shared';
 const CSV_COLUMNS = [
   'suite_id',
   'suite_name',
+  'suite_description',
   'suite_status',
   'position',
   'combination_index',
@@ -10,6 +11,8 @@ const CSV_COLUMNS = [
   'broker',
   'scenario',
   'run_id',
+  'run_name',
+  'run_description',
   'run_status',
   'created_at',
   'started_at',
@@ -51,6 +54,7 @@ export function serializeSuiteCsv(suite: Suite): string {
     return [
       suite.id,
       suite.name,
+      suite.description ?? '',
       suite.status,
       trial.position,
       trial.combinationIndex,
@@ -58,6 +62,8 @@ export function serializeSuiteCsv(suite: Suite): string {
       trial.combination.broker,
       trial.combination.scenario,
       run?.id ?? '',
+      run?.name ?? '',
+      run?.description ?? '',
       run?.status ?? 'pending',
       run?.createdAt ?? '',
       run?.startedAt ?? '',

@@ -7,6 +7,7 @@ import {
   runsQuerySchema,
   suiteEventSchema,
   suiteProgressSchema,
+  suitesQuerySchema,
   suiteSchema,
   suiteSummarySchema,
 } from './api.js';
@@ -19,6 +20,8 @@ describe('API schemas', () => {
   it('validates a complete run response', () => {
     const result = runSchema.safeParse({
       id: runId,
+      name: null,
+      description: null,
       configuration: {
         broker: 'redis',
         scenario: 'fan-out',
@@ -42,6 +45,20 @@ describe('API schemas', () => {
       offset: 10,
     });
     expect(runsQuerySchema.safeParse({ limit: 101 }).success).toBe(false);
+    expect(
+      runsQuerySchema.parse({
+        scenario: 'fan-out',
+        suite: '22222222-2222-4222-8222-222222222222',
+        dateFrom: '2026-08-01',
+        dateTo: '2026-08-31',
+      }),
+    ).toMatchObject({ scenario: 'fan-out', dateFrom: '2026-08-01' });
+    expect(
+      suitesQuerySchema.safeParse({
+        dateFrom: '2026-09-01',
+        dateTo: '2026-08-01',
+      }).success,
+    ).toBe(false);
   });
 
   it('validates cancellation responses', () => {

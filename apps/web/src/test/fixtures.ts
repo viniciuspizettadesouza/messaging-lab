@@ -28,6 +28,8 @@ export const brokers: BrokerInfo[] = (
 export function createRun(status: RunStatus = 'pending'): Run {
   return {
     id: runId,
+    name: null,
+    description: null,
     configuration: {
       broker: 'redis',
       scenario: 'fan-out',
@@ -153,6 +155,7 @@ export function createSuite(
   return {
     id: suiteId,
     name: 'Test benchmark suite',
+    description: null,
     status,
     configuration: {
       workload: { ...BENCHMARK_DEFAULTS, messageCount: 10 },

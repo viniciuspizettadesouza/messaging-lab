@@ -32,8 +32,13 @@ describe('RunRepository', () => {
   afterEach(() => database.close());
 
   it('creates, retrieves, and updates complete aggregate runs', () => {
-    const created = repository.create(configuration);
+    const created = repository.create(configuration, {
+      name: 'Named run',
+      description: 'Repository description',
+    });
     expect(created).toMatchObject({
+      name: 'Named run',
+      description: 'Repository description',
       configuration,
       status: 'pending',
       metrics: null,
@@ -91,6 +96,28 @@ describe('RunRepository', () => {
       total: 2,
       runs: [{}],
     });
+  });
+
+  it('filters by scenario and date and deletes only terminal standalone runs', () => {
+    const run = repository.create(configuration);
+    const other = repository.create({
+      ...configuration,
+      scenario: 'fan-out',
+    });
+    repository.updateStatus(run.id, 'completed');
+
+    expect(
+      repository.list({
+        scenario: 'competing-consumers',
+        dateFrom: '2026-08-18',
+        dateTo: '2026-08-18',
+        limit: 20,
+        offset: 0,
+      }),
+    ).toMatchObject({ total: 1, runs: [{ id: run.id }] });
+    expect(() => repository.deleteStandalone(other.id)).toThrow('terminal');
+    expect(repository.deleteStandalone(run.id)).toBe(true);
+    expect(repository.getById(run.id)).toBeNull();
   });
 
   it('marks pending and running runs as failed after a restart', () => {

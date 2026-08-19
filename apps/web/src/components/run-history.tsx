@@ -1,6 +1,11 @@
 import type { KeyboardEvent } from 'react';
 
-import type { Run, Suite } from '@messaging-lab/shared';
+import {
+  BROKER_IDS,
+  SCENARIO_IDS,
+  type Run,
+  type Suite,
+} from '@messaging-lab/shared';
 
 import {
   BROKER_LABELS,
@@ -17,6 +22,24 @@ interface RunHistoryProps {
   readonly selectedSuiteId: string | null;
   readonly onSelectRun: (run: Run) => void;
   readonly onSelectSuite: (suite: Suite) => void;
+  readonly filters: HistoryFilters;
+  readonly onFiltersChange: (filters: HistoryFilters) => void;
+  readonly page: number;
+  readonly totalPages: number;
+  readonly runTotal: number;
+  readonly suiteTotal: number;
+  readonly onPageChange: (page: number) => void;
+  readonly comparisonIds: ReadonlySet<string>;
+  readonly onToggleComparison: (kind: 'run' | 'suite', id: string) => void;
+}
+
+export interface HistoryFilters {
+  readonly broker: string;
+  readonly scenario: string;
+  readonly status: string;
+  readonly suite: string;
+  readonly dateFrom: string;
+  readonly dateTo: string;
 }
 
 export function RunHistory({
@@ -26,6 +49,15 @@ export function RunHistory({
   selectedSuiteId,
   onSelectRun,
   onSelectSuite,
+  filters,
+  onFiltersChange,
+  page,
+  totalPages,
+  runTotal,
+  suiteTotal,
+  onPageChange,
+  comparisonIds,
+  onToggleComparison,
 }: RunHistoryProps) {
   const suiteRunIds = new Set(
     suites.flatMap((suite) =>
@@ -48,6 +80,58 @@ export function RunHistory({
           {standaloneRuns.length === 1 ? 'run' : 'runs'}
         </p>
       </div>
+      <div className="history-filters" aria-label="History filters">
+        <FilterSelect
+          label="Broker"
+          value={filters.broker}
+          values={BROKER_IDS}
+          labels={BROKER_LABELS}
+          onChange={(broker) => onFiltersChange({ ...filters, broker })}
+        />
+        <FilterSelect
+          label="Scenario"
+          value={filters.scenario}
+          values={SCENARIO_IDS}
+          labels={SCENARIO_LABELS}
+          onChange={(scenario) => onFiltersChange({ ...filters, scenario })}
+        />
+        <FilterSelect
+          label="Status"
+          value={filters.status}
+          values={['pending', 'running', 'completed', 'failed', 'cancelled']}
+          onChange={(status) => onFiltersChange({ ...filters, status })}
+        />
+        <label>
+          Suite ID
+          <input
+            value={filters.suite}
+            placeholder="UUID"
+            onChange={(event) =>
+              onFiltersChange({ ...filters, suite: event.target.value })
+            }
+          />
+        </label>
+        <label>
+          From
+          <input
+            type="date"
+            value={filters.dateFrom}
+            onChange={(event) =>
+              onFiltersChange({ ...filters, dateFrom: event.target.value })
+            }
+          />
+        </label>
+        <label>
+          To
+          <input
+            type="date"
+            value={filters.dateTo}
+            onChange={(event) =>
+              onFiltersChange({ ...filters, dateTo: event.target.value })
+            }
+          />
+        </label>
+      </div>
       {totalExperiments === 0 ? (
         <div className="empty-row">
           <strong>No experiments yet.</strong>
@@ -63,6 +147,7 @@ export function RunHistory({
                 <th>Status</th>
                 <th>Created</th>
                 <th>Throughput</th>
+                <th>Compare</th>
               </tr>
             </thead>
             <tbody>
@@ -74,6 +159,8 @@ export function RunHistory({
                   selectedRunId={selectedRunId}
                   onSelectSuite={onSelectSuite}
                   onSelectRun={onSelectRun}
+                  comparisonIds={comparisonIds}
+                  onToggleComparison={onToggleComparison}
                 />
               ))}
               {standaloneRuns.map((run) => (
@@ -83,6 +170,8 @@ export function RunHistory({
                   selected={selectedRunId === run.id}
                   onSelect={onSelectRun}
                   standalone
+                  comparisonIds={comparisonIds}
+                  onToggleComparison={onToggleComparison}
                 />
               ))}
             </tbody>
@@ -95,6 +184,30 @@ export function RunHistory({
           experiments.
         </p>
       ) : null}
+      <div className="history-pagination" aria-label="History pagination">
+        <button
+          type="button"
+          disabled={page <= 1}
+          onClick={() => onPageChange(page - 1)}
+        >
+          Previous
+        </button>
+        <span>
+          Page {page} of {totalPages} · {suiteTotal} suites · {runTotal} runs
+        </span>
+        <button
+          type="button"
+          disabled={page >= totalPages}
+          onClick={() => onPageChange(page + 1)}
+        >
+          Next
+        </button>
+      </div>
+      <ManualComparison
+        runs={runs}
+        suites={suites}
+        comparisonIds={comparisonIds}
+      />
     </section>
   );
 }
@@ -105,12 +218,16 @@ function SuiteRows({
   selectedRunId,
   onSelectSuite,
   onSelectRun,
+  comparisonIds,
+  onToggleComparison,
 }: {
   readonly suite: Suite;
   readonly selectedSuiteId: string | null;
   readonly selectedRunId: string | null;
   readonly onSelectSuite: (suite: Suite) => void;
   readonly onSelectRun: (run: Run) => void;
+  readonly comparisonIds: ReadonlySet<string>;
+  readonly onToggleComparison: (kind: 'run' | 'suite', id: string) => void;
 }) {
   return (
     <>
@@ -128,6 +245,9 @@ function SuiteRows({
           >
             {suite.name}
           </button>
+          {suite.description ? (
+            <small className="row-description">{suite.description}</small>
+          ) : null}
           <span className="row-kind">
             Suite · {suite.progress.totalRuns} trials
           </span>
@@ -140,6 +260,13 @@ function SuiteRows({
         <td>
           {suite.progress.completedRuns}/{suite.progress.totalRuns} finished
         </td>
+        <td>
+          <ComparisonCheckbox
+            label={`Compare suite ${suite.name}`}
+            checked={comparisonIds.has(`suite:${suite.id}`)}
+            onChange={() => onToggleComparison('suite', suite.id)}
+          />
+        </td>
       </tr>
       {suite.runs.map((item) =>
         item.run ? (
@@ -149,6 +276,8 @@ function SuiteRows({
             selected={selectedRunId === item.run.id}
             onSelect={onSelectRun}
             suiteChild
+            comparisonIds={comparisonIds}
+            onToggleComparison={onToggleComparison}
           />
         ) : null,
       )}
@@ -162,12 +291,16 @@ function RunRow({
   onSelect,
   suiteChild = false,
   standalone = false,
+  comparisonIds,
+  onToggleComparison,
 }: {
   readonly run: Run;
   readonly selected: boolean;
   readonly onSelect: (run: Run) => void;
   readonly suiteChild?: boolean;
   readonly standalone?: boolean;
+  readonly comparisonIds: ReadonlySet<string>;
+  readonly onToggleComparison: (kind: 'run' | 'suite', id: string) => void;
 }) {
   return (
     <tr
@@ -183,8 +316,11 @@ function RunRow({
           onClick={() => onSelect(run)}
         >
           {suiteChild ? '↳ ' : ''}
-          {BROKER_LABELS[run.configuration.broker]}
+          {run.name ?? BROKER_LABELS[run.configuration.broker]}
         </button>
+        {run.description ? (
+          <small className="row-description">{run.description}</small>
+        ) : null}
         {standalone ? <span className="row-kind">Standalone run</span> : null}
       </td>
       <td>{SCENARIO_LABELS[run.configuration.scenario]}</td>
@@ -197,8 +333,157 @@ function RunRow({
           ? `${formatNumber(run.metrics.throughputMessagesPerSecond)} msg/s`
           : '—'}
       </td>
+      <td>
+        <ComparisonCheckbox
+          label={`Compare run ${run.name ?? BROKER_LABELS[run.configuration.broker]}`}
+          checked={comparisonIds.has(`run:${run.id}`)}
+          onChange={() => onToggleComparison('run', run.id)}
+        />
+      </td>
     </tr>
   );
+}
+
+function FilterSelect({
+  label,
+  value,
+  values,
+  labels,
+  onChange,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly values: readonly string[];
+  readonly labels?: Record<string, string>;
+  readonly onChange: (value: string) => void;
+}) {
+  return (
+    <label>
+      {label}
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">All</option>
+        {values.map((item) => (
+          <option key={item} value={item}>
+            {labels?.[item] ?? item}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function ComparisonCheckbox({
+  label,
+  checked,
+  onChange,
+}: {
+  readonly label: string;
+  readonly checked: boolean;
+  readonly onChange: () => void;
+}) {
+  return (
+    <input
+      type="checkbox"
+      aria-label={label}
+      checked={checked}
+      onChange={onChange}
+    />
+  );
+}
+
+function ManualComparison({
+  runs,
+  suites,
+  comparisonIds,
+}: {
+  readonly runs: Run[];
+  readonly suites: Suite[];
+  readonly comparisonIds: ReadonlySet<string>;
+}) {
+  const entries = [
+    ...runs
+      .filter(({ id }) => comparisonIds.has(`run:${id}`))
+      .flatMap((run) =>
+        run.metrics
+          ? [
+              {
+                key: `run:${run.id}`,
+                label: run.name ?? `Run ${run.id.slice(0, 8)}`,
+                broker: run.configuration.broker,
+                scenario: run.configuration.scenario,
+                throughput: run.metrics.throughputMessagesPerSecond,
+                p95Latency: run.metrics.latency.p95Ms,
+              },
+            ]
+          : [],
+      ),
+    ...suites
+      .filter(({ id }) => comparisonIds.has(`suite:${id}`))
+      .flatMap((suite) =>
+        suite.combinationSummaries.flatMap((summary) =>
+          summary.throughput
+            ? [
+                {
+                  key: `suite:${suite.id}:${summary.combinationIndex}`,
+                  label: suite.name,
+                  broker: summary.combination.broker,
+                  scenario: summary.combination.scenario,
+                  throughput: summary.throughput.median,
+                  p95Latency: summary.latency.p95Ms?.median ?? null,
+                },
+              ]
+            : [],
+        ),
+      ),
+  ];
+  if (comparisonIds.size === 0) return null;
+  const groups = new Map<string, typeof entries>();
+  for (const entry of entries) {
+    const group = comparisonGroup(entry.broker, entry.scenario);
+    groups.set(group, [...(groups.get(group) ?? []), entry]);
+  }
+  return (
+    <section
+      className="manual-comparison"
+      aria-labelledby="manual-comparison-heading"
+    >
+      <h3 id="manual-comparison-heading">Manual comparison</h3>
+      <p>
+        Semantically incompatible selections are separated into distinct groups.
+      </p>
+      {entries.length === 0 ? (
+        <p>No selected experiment has completed metrics.</p>
+      ) : null}
+      {[...groups].map(([group, groupEntries]) => (
+        <article key={group}>
+          <h4>{group}</h4>
+          <ul>
+            {groupEntries.map((entry) => (
+              <li key={entry.key}>
+                <span>
+                  {entry.label} · {BROKER_LABELS[entry.broker]}
+                </span>
+                <strong>
+                  {formatNumber(entry.throughput, 2)} msg/s
+                  {entry.p95Latency === null
+                    ? ''
+                    : ` · p95 ${formatNumber(entry.p95Latency, 2)} ms`}
+                </strong>
+              </li>
+            ))}
+          </ul>
+        </article>
+      ))}
+    </section>
+  );
+}
+
+function comparisonGroup(broker: string, scenario: string): string {
+  if (broker === 'redis' && scenario === 'fan-out')
+    return 'Ephemeral live baseline';
+  return scenario === 'fan-out'
+    ? 'Durable fan-out'
+    : 'Durable competing consumers';
 }
 
 function navigateHistory(event: KeyboardEvent<HTMLButtonElement>): void {

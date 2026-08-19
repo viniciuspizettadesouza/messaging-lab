@@ -8,18 +8,23 @@ import type {
   Suite,
 } from '@messaging-lab/shared';
 
-import { ApiClient, type DashboardApi } from './api/client.js';
+import {
+  ApiClient,
+  type DashboardApi,
+  type HistoryQuery,
+} from './api/client.js';
 import { BrokerOverview } from './components/broker-overview.js';
 import { CapabilityMatrix } from './components/capability-matrix.js';
 import { ComparisonCharts } from './components/comparison-charts.js';
 import { ExperimentForm } from './components/experiment-form.js';
 import { RunDetail } from './components/run-detail.js';
-import { RunHistory } from './components/run-history.js';
+import { RunHistory, type HistoryFilters } from './components/run-history.js';
 import { SuiteDetail } from './components/suite-detail.js';
 import { useRunLifecycle } from './hooks/use-run-lifecycle.js';
 import { useSuiteLifecycle } from './hooks/use-suite-lifecycle.js';
 
 const defaultApi = new ApiClient();
+const HISTORY_LIMIT = 10;
 
 type Selection =
   | { readonly kind: 'run'; readonly id: string }
@@ -33,17 +38,39 @@ export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
   const [selection, setSelection] = useState<Selection>(null);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState<string | null>(null);
+  const [historyFilters, setHistoryFilters] = useState(readHistoryFilters);
+  const [historyPage, setHistoryPage] = useState(readHistoryPage);
+  const [runTotal, setRunTotal] = useState(0);
+  const [suiteTotal, setSuiteTotal] = useState(0);
+  const [comparisonIds, setComparisonIds] = useState<Set<string>>(new Set());
+
+  const historyQuery = useCallback(
+    (): HistoryQuery => ({
+      ...(historyFilters.broker ? { broker: historyFilters.broker } : {}),
+      ...(historyFilters.scenario ? { scenario: historyFilters.scenario } : {}),
+      ...(historyFilters.status ? { status: historyFilters.status } : {}),
+      ...(isUuid(historyFilters.suite) ? { suite: historyFilters.suite } : {}),
+      ...(historyFilters.dateFrom ? { dateFrom: historyFilters.dateFrom } : {}),
+      ...(historyFilters.dateTo ? { dateTo: historyFilters.dateTo } : {}),
+      limit: HISTORY_LIMIT,
+      offset: (historyPage - 1) * HISTORY_LIMIT,
+    }),
+    [historyFilters, historyPage],
+  );
 
   const refreshRuns = useCallback(async () => {
-    const nextRuns = await api.getRuns();
-    setRuns(nextRuns);
-    return nextRuns;
-  }, [api]);
+    const result = await api.getRunPage(historyQuery());
+    setRuns(result.runs);
+    setRunTotal(result.total);
+    return result.runs;
+  }, [api, historyQuery]);
   const refreshSuites = useCallback(async () => {
-    const nextSuites = await api.getSuites();
-    setSuites(nextSuites);
-    return nextSuites;
-  }, [api]);
+    const query = historyQuery();
+    const result = await api.getSuitePage(query);
+    setSuites(result.suites);
+    setSuiteTotal(result.total);
+    return result.suites;
+  }, [api, historyQuery]);
   const reportError = useCallback((error: unknown) => {
     setPageError(errorMessage(error));
   }, []);
@@ -106,15 +133,19 @@ export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
     let active = true;
     void (async () => {
       try {
-        const [nextBrokers, nextRuns, nextSuites] = await Promise.all([
+        const [nextBrokers, runPage, suitePage] = await Promise.all([
           api.getBrokers(),
-          api.getRuns(),
-          api.getSuites(),
+          api.getRunPage(historyQuery()),
+          api.getSuitePage(historyQuery()),
         ]);
         if (!active) return;
+        const nextRuns = runPage.runs;
+        const nextSuites = suitePage.suites;
         setBrokers(nextBrokers);
         setRuns(nextRuns);
         setSuites(nextSuites);
+        setRunTotal(runPage.total);
+        setSuiteTotal(suitePage.total);
 
         const urlSelection = readSelection();
         if (urlSelection?.kind === 'suite') {
@@ -148,7 +179,49 @@ export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
     return () => {
       active = false;
     };
-  }, [api, displayRun, displaySuite]);
+  }, [api, displayRun, displaySuite, historyQuery]);
+
+  const changeFilters = useCallback((filters: HistoryFilters) => {
+    setHistoryFilters(filters);
+    setHistoryPage(1);
+    writeHistory(filters, 1);
+  }, []);
+
+  const changePage = useCallback((page: number) => {
+    setHistoryPage(page);
+    setHistoryFilters((filters) => {
+      writeHistory(filters, page);
+      return filters;
+    });
+  }, []);
+
+  const toggleComparison = useCallback((kind: 'run' | 'suite', id: string) => {
+    const key = `${kind}:${id}`;
+    setComparisonIds((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  async function deleteSelection(): Promise<void> {
+    if (!selection) return;
+    const label =
+      selection.kind === 'suite' ? 'suite and all of its runs' : 'run';
+    if (!window.confirm(`Delete this ${label} from local history?`)) return;
+    try {
+      if (selection.kind === 'suite') await api.deleteSuite(selection.id);
+      else await api.deleteRun(selection.id);
+      setSelection(null);
+      selectRun(null);
+      selectSuite(null);
+      clearSelection();
+      await Promise.all([refreshRuns(), refreshSuites()]);
+    } catch (error) {
+      reportError(error);
+    }
+  }
 
   async function startRun(request: StartRunRequest): Promise<void> {
     setPageError(null);
@@ -254,6 +327,7 @@ export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
                   disconnected={suiteDisconnected}
                   onCancel={cancelSuite}
                   onSelectRun={displayRun}
+                  onDelete={deleteSelection}
                 />
               ) : (
                 <RunDetail
@@ -261,6 +335,7 @@ export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
                   progress={progress}
                   disconnected={runDisconnected}
                   onCancel={cancelRun}
+                  onDelete={deleteSelection}
                 />
               )}
             </div>
@@ -274,6 +349,18 @@ export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
                 }
                 onSelectRun={displayRun}
                 onSelectSuite={displaySuite}
+                filters={historyFilters}
+                onFiltersChange={changeFilters}
+                page={historyPage}
+                totalPages={Math.max(
+                  1,
+                  Math.ceil(Math.max(runTotal, suiteTotal) / HISTORY_LIMIT),
+                )}
+                runTotal={runTotal}
+                suiteTotal={suiteTotal}
+                onPageChange={changePage}
+                comparisonIds={comparisonIds}
+                onToggleComparison={toggleComparison}
               />
             </div>
             <ComparisonCharts runs={runs} />
@@ -312,9 +399,59 @@ function readSelection(): Selection {
 
 function writeSelection(kind: 'run' | 'suite', id: string): void {
   const url = new URL(window.location.href);
-  url.search = '';
+  url.searchParams.delete('run');
+  url.searchParams.delete('suite');
   url.searchParams.set(kind, id);
   window.history.replaceState(null, '', url);
+}
+
+function readHistoryFilters(): HistoryFilters {
+  const parameters = new URLSearchParams(window.location.search);
+  return {
+    broker: parameters.get('broker') ?? '',
+    scenario: parameters.get('scenario') ?? '',
+    status: parameters.get('status') ?? '',
+    suite: parameters.get('historySuite') ?? '',
+    dateFrom: parameters.get('dateFrom') ?? '',
+    dateTo: parameters.get('dateTo') ?? '',
+  };
+}
+
+function readHistoryPage(): number {
+  const value = Number(new URLSearchParams(window.location.search).get('page'));
+  return Number.isInteger(value) && value > 0 ? value : 1;
+}
+
+function writeHistory(filters: HistoryFilters, page: number): void {
+  const url = new URL(window.location.href);
+  const values = {
+    broker: filters.broker,
+    scenario: filters.scenario,
+    status: filters.status,
+    historySuite: filters.suite,
+    dateFrom: filters.dateFrom,
+    dateTo: filters.dateTo,
+  };
+  for (const [key, value] of Object.entries(values)) {
+    if (value) url.searchParams.set(key, value);
+    else url.searchParams.delete(key);
+  }
+  if (page > 1) url.searchParams.set('page', String(page));
+  else url.searchParams.delete('page');
+  window.history.replaceState(null, '', url);
+}
+
+function clearSelection(): void {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('run');
+  url.searchParams.delete('suite');
+  window.history.replaceState(null, '', url);
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
 }
 
 function errorMessage(error: unknown): string {

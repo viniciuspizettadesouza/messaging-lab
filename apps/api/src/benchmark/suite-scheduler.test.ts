@@ -156,7 +156,11 @@ describe('SuiteScheduler', () => {
 function request(
   suiteConfiguration: SuiteConfiguration,
 ): ResolvedCreateSuiteRequest {
-  return { name: 'Scheduler suite', configuration: suiteConfiguration };
+  return {
+    name: 'Scheduler suite',
+    description: null,
+    configuration: suiteConfiguration,
+  };
 }
 
 function createScheduler(

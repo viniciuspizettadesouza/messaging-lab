@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import {
   runConfigurationSchema,
+  experimentDescriptionSchema,
   suiteCombinationSchema,
   suiteConfigurationSchema,
   suiteNameSchema,
@@ -30,6 +31,8 @@ export const runErrorSchema = z
 export const runSchema = z
   .object({
     id: runIdSchema,
+    name: suiteNameSchema.nullable(),
+    description: experimentDescriptionSchema,
     configuration: runConfigurationSchema,
     status: runStatusSchema,
     createdAt: isoTimestampSchema,
@@ -267,6 +270,7 @@ export const suiteSchema = z
   .object({
     id: suiteIdSchema,
     name: suiteNameSchema,
+    description: experimentDescriptionSchema,
     status: suiteStatusSchema,
     configuration: suiteConfigurationSchema,
     progress: suiteProgressSchema,
@@ -287,10 +291,22 @@ export const suiteIdParamsSchema = z.object({ id: suiteIdSchema }).strict();
 export const suitesQuerySchema = z
   .object({
     status: suiteStatusSchema.optional(),
+    broker: brokerIdSchema.optional(),
+    scenario: z.enum(['fan-out', 'competing-consumers']).optional(),
+    suite: suiteIdSchema.optional(),
+    dateFrom: z.iso.date().optional(),
+    dateTo: z.iso.date().optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20),
     offset: z.coerce.number().int().nonnegative().default(0),
   })
-  .strict();
+  .strict()
+  .refine(
+    ({ dateFrom, dateTo }) => !dateFrom || !dateTo || dateFrom <= dateTo,
+    {
+      message: 'dateFrom must not be after dateTo.',
+      path: ['dateFrom'],
+    },
+  );
 export const suitesResponseSchema = z
   .object({
     suites: z.array(suiteSchema),
@@ -334,11 +350,22 @@ export const runIdParamsSchema = z.object({ id: runIdSchema }).strict();
 export const runsQuerySchema = z
   .object({
     broker: brokerIdSchema.optional(),
+    scenario: z.enum(['fan-out', 'competing-consumers']).optional(),
     status: runStatusSchema.optional(),
+    suite: suiteIdSchema.optional(),
+    dateFrom: z.iso.date().optional(),
+    dateTo: z.iso.date().optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20),
     offset: z.coerce.number().int().nonnegative().default(0),
   })
-  .strict();
+  .strict()
+  .refine(
+    ({ dateFrom, dateTo }) => !dateFrom || !dateTo || dateFrom <= dateTo,
+    {
+      message: 'dateFrom must not be after dateTo.',
+      path: ['dateFrom'],
+    },
+  );
 
 export const runsResponseSchema = z
   .object({
@@ -353,6 +380,14 @@ export const cancelRunResponseSchema = z
   .object({
     runId: runIdSchema,
     cancellationRequested: z.literal(true),
+  })
+  .strict();
+
+export const deleteExperimentResponseSchema = z
+  .object({
+    id: z.uuid(),
+    deleted: z.literal(true),
+    deletedRuns: z.number().int().nonnegative(),
   })
   .strict();
 
@@ -483,6 +518,9 @@ export type RunIdParams = z.infer<typeof runIdParamsSchema>;
 export type RunsQuery = z.output<typeof runsQuerySchema>;
 export type RunsResponse = z.infer<typeof runsResponseSchema>;
 export type CancelRunResponse = z.infer<typeof cancelRunResponseSchema>;
+export type DeleteExperimentResponse = z.infer<
+  typeof deleteExperimentResponseSchema
+>;
 export type ErrorResponse = z.infer<typeof errorResponseSchema>;
 export type RunPhase = z.infer<typeof runPhaseSchema>;
 export type RunEvent = z.infer<typeof runEventSchema>;

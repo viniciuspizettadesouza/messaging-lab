@@ -67,6 +67,8 @@ function trial(
   const timestamp = '2026-08-19T12:00:00.000Z';
   const run: Run = {
     id: `11111111-1111-4111-8111-${String(position + 1).padStart(12, '0')}`,
+    name: null,
+    description: null,
     configuration: { ...BENCHMARK_DEFAULTS, ...combination },
     status,
     createdAt: timestamp,

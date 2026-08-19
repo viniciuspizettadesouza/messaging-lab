@@ -86,16 +86,16 @@ This checklist continues from the completed MVP. Items are ordered by dependency
 
 ## 15. History, filtering, and manual comparison
 
-- [ ] Extend the existing API filters with scenario, suite, and date range.
-- [ ] Add pagination controls to the dashboard using the API's existing `total`, `limit`, and `offset` metadata.
-- [ ] Add dashboard filters that synchronize with the URL.
-- [ ] Allow users to select compatible runs or suites for manual comparison.
-- [ ] Reject or clearly separate semantically incompatible selections.
-- [ ] Allow suites and standalone runs to have a name and optional description.
-- [ ] Add saved local workload presets.
-- [ ] Add explicit deletion for selected runs or suites with confirmation.
-- [ ] Define cascade and broker-resource behavior for local history deletion.
-- [ ] Add repository, API, and UI tests for filtering, pagination, selection, and deletion.
+- [x] Extend the existing API filters with scenario, suite, and date range.
+- [x] Add pagination controls to the dashboard using the API's existing `total`, `limit`, and `offset` metadata.
+- [x] Add dashboard filters that synchronize with the URL.
+- [x] Allow users to select compatible runs or suites for manual comparison.
+- [x] Reject or clearly separate semantically incompatible selections.
+- [x] Allow suites and standalone runs to have a name and optional description.
+- [x] Add saved local workload presets.
+- [x] Add explicit deletion for selected runs or suites with confirmation.
+- [x] Define cascade and broker-resource behavior for local history deletion.
+- [x] Add repository, API, and UI tests for filtering, pagination, selection, and deletion.
 
 ## 16. Parameter sweep experiments
 

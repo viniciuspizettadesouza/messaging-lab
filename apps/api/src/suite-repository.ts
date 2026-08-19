@@ -16,6 +16,8 @@ import {
   type SuiteError,
   type EnvironmentSnapshot,
   type SuiteStatus,
+  type BrokerId,
+  type ScenarioId,
 } from '@messaging-lab/shared';
 
 import { RunRepository } from './run-repository.js';
@@ -30,6 +32,11 @@ export interface SuiteExecutionItem {
 
 export interface ListSuitesOptions {
   readonly status?: SuiteStatus;
+  readonly broker?: BrokerId;
+  readonly scenario?: ScenarioId;
+  readonly suite?: string;
+  readonly dateFrom?: string;
+  readonly dateTo?: string;
   readonly limit: number;
   readonly offset: number;
 }
@@ -42,6 +49,7 @@ export interface ListSuitesResult {
 interface SuiteRow {
   readonly id: string;
   readonly name: string;
+  readonly description: string | null;
   readonly configuration_json: string;
   readonly status: string;
   readonly created_at: string;
@@ -96,6 +104,7 @@ export class SuiteRepository {
     configuration: SuiteConfiguration,
     executionOrder: readonly SuiteExecutionItem[],
     environment: EnvironmentSnapshot,
+    description: string | null = null,
   ): Suite {
     const parsedConfiguration = suiteConfigurationSchema.parse(configuration);
     const parsedName = suiteNameSchema.parse(name);
@@ -109,10 +118,16 @@ export class SuiteRepository {
       this.database
         .prepare(
           `INSERT INTO suites (
-            id, name, configuration_json, status, created_at
-          ) VALUES (?, ?, ?, 'pending', ?)`,
+            id, name, description, configuration_json, status, created_at
+          ) VALUES (?, ?, ?, ?, 'pending', ?)`,
         )
-        .run(id, parsedName, JSON.stringify(parsedConfiguration), createdAt);
+        .run(
+          id,
+          parsedName,
+          description,
+          JSON.stringify(parsedConfiguration),
+          createdAt,
+        );
       const insertItem = this.database.prepare(
         `INSERT INTO suite_runs (
           suite_id, position, combination_index, repetition, broker, scenario
@@ -157,8 +172,37 @@ export class SuiteRepository {
   }
 
   public list(options: ListSuitesOptions): ListSuitesResult {
-    const where = options.status ? 'WHERE status = ?' : '';
-    const values = options.status ? [options.status] : [];
+    const conditions: string[] = [];
+    const values: Array<string | number> = [];
+    if (options.status) {
+      conditions.push('status = ?');
+      values.push(options.status);
+    }
+    if (options.broker) {
+      conditions.push(
+        'id IN (SELECT suite_id FROM suite_runs WHERE broker = ?)',
+      );
+      values.push(options.broker);
+    }
+    if (options.scenario) {
+      conditions.push(
+        'id IN (SELECT suite_id FROM suite_runs WHERE scenario = ?)',
+      );
+      values.push(options.scenario);
+    }
+    if (options.suite) {
+      conditions.push('id = ?');
+      values.push(options.suite);
+    }
+    if (options.dateFrom) {
+      conditions.push('created_at >= ?');
+      values.push(`${options.dateFrom}T00:00:00.000Z`);
+    }
+    if (options.dateTo) {
+      conditions.push('created_at <= ?');
+      values.push(`${options.dateTo}T23:59:59.999Z`);
+    }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const rows = this.database
       .prepare(
         `SELECT * FROM suites ${where}
@@ -279,6 +323,26 @@ export class SuiteRepository {
     }
   }
 
+  public delete(id: string): number | null {
+    const suite = this.getById(id);
+    if (!suite) return null;
+    if (!TERMINAL_SUITE_STATUSES.has(suite.status)) {
+      throw new Error('Only terminal suites can be deleted.');
+    }
+    const runIds = suite.runs.flatMap(({ run }) => (run ? [run.id] : []));
+    this.database.exec('BEGIN IMMEDIATE;');
+    try {
+      this.database.prepare('DELETE FROM suites WHERE id = ?').run(id);
+      const deleteRun = this.database.prepare('DELETE FROM runs WHERE id = ?');
+      for (const runId of runIds) deleteRun.run(runId);
+      this.database.exec('COMMIT;');
+      return runIds.length;
+    } catch (error) {
+      this.database.exec('ROLLBACK;');
+      throw error;
+    }
+  }
+
   private hydrate(row: SuiteRow): Suite {
     const configuration = suiteConfigurationSchema.parse(
       JSON.parse(row.configuration_json),
@@ -328,6 +392,7 @@ export class SuiteRepository {
     return suiteSchema.parse({
       id: row.id,
       name: row.name,
+      description: row.description,
       status: row.status,
       configuration,
       progress: {

@@ -22,6 +22,9 @@ This project is an educational lab, not a universal broker ranking. Results desc
 - Compare repeated trials with medians, quartiles, ranges, anomaly totals, and low-sample warnings.
 - Export every suite and its underlying trials as JSON or CSV.
 - Inspect and export privacy-conscious environment provenance for reproducibility.
+- Filter and paginate history by broker, scenario, status, suite, and date.
+- Name experiments, save local workload presets, and compare compatible selections.
+- Explicitly delete terminal local history with suite-aware cascading.
 - See where persistence, acknowledgements, recovery, and replay are genuinely supported.
 
 Suites are coordinated and persisted by the API, not the browser. They continue

@@ -2,6 +2,7 @@ import type {
   BrokerAdapter,
   BrokerId,
   ResolvedStartRunRequest,
+  RunConfiguration,
   Run,
   RunError,
   RunStatus,
@@ -48,7 +49,7 @@ export class RunManager {
     private readonly engine = new BenchmarkEngine(),
   ) {}
 
-  public start(configuration: ResolvedStartRunRequest): Run {
+  public start(configuration: ResolvedStartRunRequest | RunConfiguration): Run {
     if (this.activeRun) {
       throw new ApiError(
         409,
@@ -58,7 +59,11 @@ export class RunManager {
       );
     }
 
-    let run = this.repository.create(configuration);
+    const metadata =
+      'name' in configuration
+        ? { name: configuration.name, description: configuration.description }
+        : undefined;
+    let run = this.repository.create(configuration, metadata);
     for (const note of this.adapters[configuration.broker].capabilities[
       configuration.scenario
     ].notes) {
@@ -115,7 +120,7 @@ export class RunManager {
 
   private async executeRun(
     runId: string,
-    configuration: ResolvedStartRunRequest,
+    configuration: RunConfiguration,
     controller: AbortController,
   ): Promise<void> {
     const timeout = setTimeout(

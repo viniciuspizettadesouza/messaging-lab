@@ -29,6 +29,7 @@ export const SUITE_LIMITS = {
   totalRuns: { max: 100 },
   nameLength: { min: 1, max: 120 },
 } as const;
+export const EXPERIMENT_DESCRIPTION_MAX_LENGTH = 500;
 
 export const SUITE_DEFAULTS = {
   repetitions: SUITE_LIMITS.repetitions.default,
@@ -75,6 +76,13 @@ export const suiteNameSchema = z
   .trim()
   .min(SUITE_LIMITS.nameLength.min)
   .max(SUITE_LIMITS.nameLength.max);
+export const experimentDescriptionSchema = z
+  .string()
+  .trim()
+  .max(EXPERIMENT_DESCRIPTION_MAX_LENGTH)
+  .transform((value) => value || null)
+  .nullable()
+  .default(null);
 
 export const suiteConfigurationSchema = z
   .object({
@@ -136,6 +144,7 @@ const workloadRequestSchema = z
 export const createSuiteRequestSchema = z
   .object({
     name: suiteNameSchema,
+    description: experimentDescriptionSchema,
     workload: workloadRequestSchema.default(BENCHMARK_DEFAULTS),
     combinations: z
       .array(suiteCombinationSchema)
@@ -152,11 +161,16 @@ export const createSuiteRequestSchema = z
     ),
   })
   .strict()
-  .transform(({ name, ...configuration }) => ({ name, configuration }))
+  .transform(({ name, description, ...configuration }) => ({
+    name,
+    description,
+    configuration,
+  }))
   .pipe(
     z
       .object({
         name: z.string(),
+        description: z.string().nullable(),
         configuration: suiteConfigurationSchema,
       })
       .strict(),
@@ -164,6 +178,8 @@ export const createSuiteRequestSchema = z
 
 export const startRunRequestSchema = z
   .object({
+    name: suiteNameSchema.nullable().default(null),
+    description: experimentDescriptionSchema,
     broker: configurationFields.broker,
     scenario: configurationFields.scenario,
     messageCount: configurationFields.messageCount.default(

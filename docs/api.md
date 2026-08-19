@@ -32,7 +32,7 @@ Validates and starts one asynchronous benchmark. Returns `202 Accepted` with the
 }
 ```
 
-Only `broker` and `scenario` are required; omitted numeric values receive the documented defaults.
+Only `broker` and `scenario` are required; omitted numeric values receive the documented defaults. Standalone runs also accept an optional name of at most 120 characters and description of at most 500 characters.
 
 ### `GET /api/runs`
 
@@ -41,7 +41,11 @@ Returns newest-first run history with full configuration, status, aggregate metr
 | Query parameter | Default | Constraints                                                              |
 | --------------- | ------: | ------------------------------------------------------------------------ |
 | `broker`        |       — | `redis`, `kafka`, or `rabbitmq`                                          |
+| `scenario`      |       — | `fan-out` or `competing-consumers`                                       |
 | `status`        |       — | `pending`, `running`, `completed`, `failed`, `timed-out`, or `cancelled` |
+| `suite`         |       — | Exact suite UUID                                                         |
+| `dateFrom`      |       — | Inclusive UTC date in `YYYY-MM-DD`                                       |
+| `dateTo`        |       — | Inclusive UTC date in `YYYY-MM-DD`                                       |
 | `limit`         |      20 | Integer from 1 to 100                                                    |
 | `offset`        |       0 | Non-negative integer                                                     |
 
@@ -63,6 +67,18 @@ Requests cancellation of the active run and returns `202 Accepted`:
 ```
 
 Returns `409 Conflict` if the run exists but is no longer active.
+
+### `DELETE /api/runs/:id` and `DELETE /api/suites/:id`
+
+Deletes selected terminal local history. Active or pending experiments return
+`409 Conflict`. A suite-owned run cannot be deleted independently. Deleting a
+terminal suite transactionally removes its membership, snapshot, errors, and
+owned runs; run metrics, notes, and errors cascade with those runs.
+
+Deletion never contacts a broker or retries resource cleanup. Terminal runs
+already passed through lifecycle cleanup, so these endpoints mutate SQLite
+history only. Preserve any recorded cleanup failure until it has been
+investigated.
 
 ### `GET /api/runs/:id/events`
 
@@ -109,12 +125,15 @@ repetitions, fixed order, and a 1,000 ms cooldown. A suite accepts at most six
 unique combinations, 20 repetitions, a 60,000 ms cooldown, and 100 generated
 runs. Supported order strategies are `fixed`, `rotating`, and `randomized`.
 Randomized order is generated once and persisted with the suite.
+An optional description of at most 500 characters can accompany the required
+suite name.
 
 ### `GET /api/suites`
 
 Returns newest-first suites, including configuration, progress, lifecycle
-summary, errors, and ordered trial membership. It accepts an optional `status`
-filter plus the same `limit` and `offset` pagination fields as run history.
+summary, errors, and ordered trial membership. It accepts optional `status`,
+`broker`, `scenario`, exact `suite`, `dateFrom`, and `dateTo` filters plus the
+same `limit` and `offset` pagination fields as run history.
 Suite statuses are `pending`, `running`, `completed`, `failed`, `cancelled`, and
 `stopped`.
 

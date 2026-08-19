@@ -20,6 +20,8 @@ describe('startRunRequestSchema', () => {
   it('applies safe defaults', () => {
     expect(startRunRequestSchema.parse(requiredSelection)).toEqual({
       ...requiredSelection,
+      name: null,
+      description: null,
       ...BENCHMARK_DEFAULTS,
     });
   });
@@ -178,6 +180,7 @@ describe('createSuiteRequestSchema', () => {
       }),
     ).toEqual({
       name: 'Default suite',
+      description: null,
       configuration: {
         workload: BENCHMARK_DEFAULTS,
         combinations: [{ broker: 'kafka', scenario: 'fan-out' }],

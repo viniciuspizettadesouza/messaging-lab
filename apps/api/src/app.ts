@@ -7,6 +7,7 @@ import {
   cancelRunResponseSchema,
   cancelSuiteResponseSchema,
   createSuiteRequestSchema,
+  deleteExperimentResponseSchema,
   errorResponseSchema,
   runIdParamsSchema,
   runResponseSchema,
@@ -258,6 +259,27 @@ export function createApplication(
       .send(JSON.stringify(suiteResponseSchema.parse(suite), null, 2));
   });
 
+  app.delete('/api/suites/:id', async (request) => {
+    const { id } = suiteIdParamsSchema.parse(request.params);
+    const suite = suiteRepository.getById(id);
+    if (!suite) {
+      throw new ApiError(404, 'SUITE_NOT_FOUND', `Suite ${id} was not found.`);
+    }
+    if (!isTerminalSuite(suite.status)) {
+      throw new ApiError(
+        409,
+        'SUITE_NOT_TERMINAL',
+        'Only terminal suites can be deleted.',
+      );
+    }
+    const deletedRuns = suiteRepository.delete(id) ?? 0;
+    return deleteExperimentResponseSchema.parse({
+      id,
+      deleted: true,
+      deletedRuns,
+    });
+  });
+
   app.post('/api/suites/:id/cancel', async (request, reply) => {
     const { id } = suiteIdParamsSchema.parse(request.params);
     suiteScheduler.cancel(id);
@@ -327,6 +349,38 @@ export function createApplication(
         cancellationRequested: true,
       }),
     );
+  });
+
+  app.delete('/api/runs/:id', async (request) => {
+    const { id } = runIdParamsSchema.parse(request.params);
+    const run = repository.getById(id);
+    if (!run) {
+      throw new ApiError(404, 'RUN_NOT_FOUND', `Run ${id} was not found.`);
+    }
+    if (!isTerminal(run.status)) {
+      throw new ApiError(
+        409,
+        'RUN_NOT_TERMINAL',
+        'Only terminal runs can be deleted.',
+      );
+    }
+    try {
+      repository.deleteStandalone(id);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Suite-owned')) {
+        throw new ApiError(
+          409,
+          'RUN_BELONGS_TO_SUITE',
+          'Suite-owned runs must be deleted with their suite.',
+        );
+      }
+      throw error;
+    }
+    return deleteExperimentResponseSchema.parse({
+      id,
+      deleted: true,
+      deletedRuns: 1,
+    });
   });
 
   app.get('/api/runs/:id/events', async (request, reply) => {

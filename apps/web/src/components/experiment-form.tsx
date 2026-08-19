@@ -3,6 +3,7 @@ import { useMemo, useState, type FormEvent } from 'react';
 import {
   BENCHMARK_DEFAULTS,
   BENCHMARK_LIMITS,
+  EXPERIMENT_DESCRIPTION_MAX_LENGTH,
   BROKER_CAPABILITIES,
   BROKER_IDS,
   SCENARIO_IDS,
@@ -10,12 +11,14 @@ import {
   SUITE_LIMITS,
   createSuiteRequestSchema,
   startRunRequestSchema,
+  workloadConfigurationSchema,
   type BrokerId,
   type CreateSuiteRequest,
   type ScenarioId,
   type StartRunRequest,
   type SuiteCombination,
   type SuiteOrderStrategy,
+  type WorkloadConfiguration,
 } from '@messaging-lab/shared';
 
 import { BROKER_LABELS, SCENARIO_LABELS } from '../format.js';
@@ -29,6 +32,11 @@ interface ExperimentFormProps {
 const ALL_COMBINATIONS: SuiteCombination[] = BROKER_IDS.flatMap((broker) =>
   SCENARIO_IDS.map((scenario) => ({ broker, scenario })),
 );
+const PRESET_STORAGE_KEY = 'messaging-lab.workload-presets.v1';
+interface WorkloadPreset {
+  readonly name: string;
+  readonly workload: WorkloadConfiguration;
+}
 
 export function ExperimentForm({
   disabled,
@@ -53,6 +61,11 @@ export function ExperimentForm({
     BENCHMARK_DEFAULTS.timeoutMs,
   );
   const [suiteName, setSuiteName] = useState('Benchmark suite');
+  const [suiteDescription, setSuiteDescription] = useState('');
+  const [runName, setRunName] = useState('');
+  const [runDescription, setRunDescription] = useState('');
+  const [presetName, setPresetName] = useState('');
+  const [presets, setPresets] = useState<WorkloadPreset[]>(loadPresets);
   const [repetitions, setRepetitions] = useState<number>(
     SUITE_DEFAULTS.repetitions,
   );
@@ -83,6 +96,7 @@ export function ExperimentForm({
     );
     const request: CreateSuiteRequest = {
       name: suiteName,
+      description: suiteDescription,
       workload: workload(),
       combinations,
       repetitions,
@@ -104,6 +118,8 @@ export function ExperimentForm({
     const parsed = startRunRequestSchema.safeParse({
       broker,
       scenario,
+      name: runName.trim() || null,
+      description: runDescription,
       ...workload(),
     });
     if (!parsed.success) {
@@ -134,6 +150,37 @@ export function ExperimentForm({
       else next.add(key);
       return next;
     });
+  }
+
+  function savePreset(): void {
+    const name = presetName.trim();
+    if (!name) {
+      setValidationError('Enter a preset name.');
+      return;
+    }
+    const next = [
+      ...presets.filter((preset) => preset.name !== name),
+      { name, workload: workload() },
+    ];
+    try {
+      window.localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      setValidationError('This browser could not save the workload preset.');
+      return;
+    }
+    setPresets(next);
+    setPresetName('');
+    setValidationError(null);
+  }
+
+  function applyPreset(name: string): void {
+    const preset = presets.find((item) => item.name === name);
+    if (!preset) return;
+    setMessageCount(preset.workload.messageCount);
+    setPayloadSizeBytes(preset.workload.payloadSizeBytes);
+    setProducerConcurrency(preset.workload.producerConcurrency);
+    setConsumerCount(preset.workload.consumerCount);
+    setTimeoutMs(preset.workload.timeoutMs);
   }
 
   return (
@@ -174,6 +221,25 @@ export function ExperimentForm({
                   </option>
                 ))}
               </select>
+            </label>
+          </div>
+
+          <div className="form-grid two-columns experiment-metadata">
+            <label>
+              Standalone name (optional)
+              <input
+                value={runName}
+                maxLength={SUITE_LIMITS.nameLength.max}
+                onChange={(event) => setRunName(event.target.value)}
+              />
+            </label>
+            <label>
+              Standalone description (optional)
+              <input
+                value={runDescription}
+                maxLength={EXPERIMENT_DESCRIPTION_MAX_LENGTH}
+                onChange={(event) => setRunDescription(event.target.value)}
+              />
             </label>
           </div>
 
@@ -237,6 +303,38 @@ export function ExperimentForm({
             />
           </div>
 
+          <div className="preset-controls" aria-label="Saved workload presets">
+            <label>
+              Load preset
+              <select
+                defaultValue=""
+                onChange={(event) => applyPreset(event.target.value)}
+              >
+                <option value="">Choose a preset</option>
+                {presets.map((preset) => (
+                  <option key={preset.name} value={preset.name}>
+                    {preset.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Preset name
+              <input
+                value={presetName}
+                maxLength={120}
+                onChange={(event) => setPresetName(event.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={savePreset}
+            >
+              Save workload preset
+            </button>
+          </div>
+
           <div
             className="suite-builder"
             aria-labelledby="suite-builder-heading"
@@ -251,6 +349,14 @@ export function ExperimentForm({
                 value={suiteName}
                 maxLength={SUITE_LIMITS.nameLength.max}
                 onChange={(event) => setSuiteName(event.target.value)}
+              />
+            </label>
+            <label>
+              Suite description (optional)
+              <input
+                value={suiteDescription}
+                maxLength={EXPERIMENT_DESCRIPTION_MAX_LENGTH}
+                onChange={(event) => setSuiteDescription(event.target.value)}
               />
             </label>
             <fieldset className="combination-picker">
@@ -366,4 +472,28 @@ function humanize(value: string): string {
   return value
     .replace(/([A-Z])/g, ' $1')
     .replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function loadPresets(): WorkloadPreset[] {
+  try {
+    const parsed: unknown = JSON.parse(
+      window.localStorage.getItem(PRESET_STORAGE_KEY) ?? '[]',
+    );
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((value) => {
+      if (
+        !value ||
+        typeof value !== 'object' ||
+        !('name' in value) ||
+        !('workload' in value)
+      )
+        return [];
+      const workload = workloadConfigurationSchema.safeParse(value.workload);
+      return typeof value.name === 'string' && workload.success
+        ? [{ name: value.name, workload: workload.data }]
+        : [];
+    });
+  } catch {
+    return [];
+  }
 }

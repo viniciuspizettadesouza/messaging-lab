@@ -5,6 +5,7 @@ import {
   brokersResponseSchema,
   cancelRunResponseSchema,
   cancelSuiteResponseSchema,
+  deleteExperimentResponseSchema,
   errorResponseSchema,
   runEventSchema,
   runResponseSchema,
@@ -88,15 +89,18 @@ describe('API', () => {
       scenario: 'fan-out',
       ...BENCHMARK_DEFAULTS,
     });
-    const kafkaRun = application.repository.create({
-      broker: 'kafka',
-      scenario: 'competing-consumers',
-      ...BENCHMARK_DEFAULTS,
-    });
+    const kafkaRun = application.repository.create(
+      {
+        broker: 'kafka',
+        scenario: 'competing-consumers',
+        ...BENCHMARK_DEFAULTS,
+      },
+      { name: 'Kafka baseline', description: 'Named standalone run.' },
+    );
 
     const listResponse = await application.app.inject({
       method: 'GET',
-      url: '/api/runs?broker=kafka&limit=10&offset=0',
+      url: `/api/runs?broker=kafka&scenario=competing-consumers&dateFrom=${kafkaRun.createdAt.slice(0, 10)}&dateTo=${kafkaRun.createdAt.slice(0, 10)}&limit=10&offset=0`,
     });
     const detailResponse = await application.app.inject({
       method: 'GET',
@@ -106,10 +110,23 @@ describe('API', () => {
     expect(listResponse.statusCode).toBe(200);
     expect(runsResponseSchema.parse(listResponse.json())).toMatchObject({
       total: 1,
-      runs: [{ id: kafkaRun.id }],
+      runs: [{ id: kafkaRun.id, name: 'Kafka baseline' }],
     });
     expect(detailResponse.statusCode).toBe(200);
     expect(runResponseSchema.parse(detailResponse.json()).id).toBe(kafkaRun.id);
+
+    application.repository.updateStatus(kafkaRun.id, 'completed');
+    const deleteResponse = await application.app.inject({
+      method: 'DELETE',
+      url: `/api/runs/${kafkaRun.id}`,
+    });
+    expect(deleteExperimentResponseSchema.parse(deleteResponse.json())).toEqual(
+      {
+        id: kafkaRun.id,
+        deleted: true,
+        deletedRuns: 1,
+      },
+    );
   });
 
   it('returns structured validation and not-found errors', async () => {
@@ -145,6 +162,8 @@ describe('API', () => {
       method: 'POST',
       url: '/api/runs',
       payload: {
+        name: 'Named API run',
+        description: 'Standalone API description.',
         broker: 'redis',
         scenario: 'fan-out',
         messageCount: 2,
@@ -156,6 +175,10 @@ describe('API', () => {
     expect(startResponse.statusCode).toBe(202);
     const started = runResponseSchema.parse(startResponse.json());
     const completed = await waitForCompletedRun(application, started.id);
+    expect(completed).toMatchObject({
+      name: 'Named API run',
+      description: 'Standalone API description.',
+    });
     expect(completed.metrics).toMatchObject({
       publishedMessages: 2,
       receivedMessages: 4,
@@ -224,6 +247,7 @@ describe('API', () => {
       url: '/api/suites',
       payload: {
         name: 'API suite',
+        description: 'Suite API description.',
         workload: { messageCount: 2, payloadSizeBytes: 16 },
         combinations: [
           { broker: 'redis', scenario: 'competing-consumers' },
@@ -249,7 +273,7 @@ describe('API', () => {
 
     const listResponse = await application.app.inject({
       method: 'GET',
-      url: '/api/suites?status=completed&limit=10&offset=0',
+      url: `/api/suites?status=completed&broker=kafka&scenario=fan-out&dateFrom=${completed.createdAt.slice(0, 10)}&dateTo=${completed.createdAt.slice(0, 10)}&limit=10&offset=0`,
     });
     const detailResponse = await application.app.inject({
       method: 'GET',
@@ -257,7 +281,7 @@ describe('API', () => {
     });
     expect(suitesResponseSchema.parse(listResponse.json())).toMatchObject({
       total: 1,
-      suites: [{ id: created.id }],
+      suites: [{ id: created.id, description: 'Suite API description.' }],
     });
     expect(suiteResponseSchema.parse(detailResponse.json()).runs).toHaveLength(
       2,
@@ -313,6 +337,32 @@ describe('API', () => {
         expect.objectContaining({ type: 'status', status: 'completed' }),
       ]),
     );
+
+    const ownedRunIds = completed.runs.flatMap(({ run }) =>
+      run ? [run.id] : [],
+    );
+    const childDelete = await application.app.inject({
+      method: 'DELETE',
+      url: `/api/runs/${ownedRunIds[0]}`,
+    });
+    expect(childDelete.statusCode).toBe(409);
+    expect(errorResponseSchema.parse(childDelete.json())).toMatchObject({
+      error: { code: 'RUN_BELONGS_TO_SUITE' },
+    });
+    const deleteResponse = await application.app.inject({
+      method: 'DELETE',
+      url: `/api/suites/${created.id}`,
+    });
+    expect(deleteExperimentResponseSchema.parse(deleteResponse.json())).toEqual(
+      {
+        id: created.id,
+        deleted: true,
+        deletedRuns: 2,
+      },
+    );
+    for (const runId of ownedRunIds) {
+      expect(application.repository.getById(runId)).toBeNull();
+    }
   });
 
   it('validates suite creation and returns suite not-found errors', async () => {

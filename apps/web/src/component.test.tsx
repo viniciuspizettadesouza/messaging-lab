@@ -27,6 +27,7 @@ describe('dashboard components', () => {
           progress={null}
           disconnected={false}
           onCancel={vi.fn()}
+          onDelete={vi.fn()}
         />,
       );
       expect(
@@ -126,6 +127,40 @@ describe('dashboard components', () => {
     );
   });
 
+  it('saves and restores local workload presets', async () => {
+    render(
+      <ExperimentForm
+        disabled={false}
+        onStart={vi.fn(async () => undefined)}
+        onStartSuite={vi.fn(async () => undefined)}
+      />,
+    );
+    const user = userEvent.setup();
+    const messages = screen.getByRole('spinbutton', { name: /Messages/ });
+    await user.clear(messages);
+    await user.type(messages, '42');
+    await user.type(
+      screen.getByRole('textbox', { name: 'Preset name' }),
+      'Tiny',
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Save workload preset' }),
+    );
+    await user.clear(messages);
+    await user.type(messages, '99');
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Load preset' }),
+      'Tiny',
+    );
+
+    expect(messages).toHaveValue(42);
+    expect(
+      JSON.parse(
+        window.localStorage.getItem('messaging-lab.workload-presets.v1')!,
+      ),
+    ).toHaveLength(1);
+  });
+
   it('shows unsuccessful suite trials and accessible overall progress', () => {
     const suite = createSuite('completed', ['failed', 'timed-out']);
     const { rerender } = render(
@@ -134,6 +169,7 @@ describe('dashboard components', () => {
         disconnected={false}
         onCancel={vi.fn()}
         onSelectRun={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
@@ -150,6 +186,7 @@ describe('dashboard components', () => {
         disconnected={false}
         onCancel={vi.fn()}
         onSelectRun={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
     expect(screen.getAllByText('Cancelled').length).toBeGreaterThan(0);
@@ -167,6 +204,7 @@ describe('dashboard components', () => {
         disconnected={false}
         onCancel={vi.fn()}
         onSelectRun={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
     await userEvent.click(screen.getByText('Environment and reproducibility'));
@@ -183,7 +221,14 @@ describe('dashboard components', () => {
     const standalone = {
       ...createRun('completed'),
       id: '33333333-3333-4333-8333-333333333333',
+      configuration: {
+        ...createRun('completed').configuration,
+        broker: 'kafka' as const,
+        scenario: 'fan-out' as const,
+      },
     };
+    const onFiltersChange = vi.fn();
+    const onPageChange = vi.fn();
     render(
       <RunHistory
         runs={[
@@ -195,6 +240,22 @@ describe('dashboard components', () => {
         selectedSuiteId={null}
         onSelectRun={vi.fn()}
         onSelectSuite={vi.fn()}
+        filters={{
+          broker: '',
+          scenario: '',
+          status: '',
+          suite: '',
+          dateFrom: '',
+          dateTo: '',
+        }}
+        onFiltersChange={onFiltersChange}
+        page={1}
+        totalPages={2}
+        runTotal={3}
+        suiteTotal={1}
+        onPageChange={onPageChange}
+        comparisonIds={new Set([`suite:${suite.id}`, `run:${standalone.id}`])}
+        onToggleComparison={vi.fn()}
       />,
     );
     const suiteLink = screen.getByRole('button', { name: suite.name });
@@ -204,6 +265,21 @@ describe('dashboard components', () => {
     expect(document.activeElement).toHaveTextContent('Redis');
     expect(screen.getByText('Standalone run')).toBeInTheDocument();
     expect(screen.getByText('Suite · 2 trials')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Ephemeral live baseline' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Durable fan-out' }),
+    ).toBeInTheDocument();
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: 'Broker' }),
+      'kafka',
+    );
+    expect(onFiltersChange).toHaveBeenCalledWith(
+      expect.objectContaining({ broker: 'kafka' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(onPageChange).toHaveBeenCalledWith(2);
   });
 });
 
@@ -211,14 +287,28 @@ function staticApi(): DashboardApi {
   return {
     getBrokers: vi.fn(async () => brokers),
     getRuns: vi.fn(async () => []),
+    getRunPage: vi.fn(async () => ({
+      runs: [],
+      total: 0,
+      limit: 10,
+      offset: 0,
+    })),
     getRun: vi.fn(async () => createRun('completed')),
     startRun: vi.fn(async () => createRun('pending')),
     cancelRun: vi.fn(async () => undefined),
+    deleteRun: vi.fn(async () => undefined),
     subscribe: vi.fn(() => () => undefined),
     getSuites: vi.fn(async () => []),
+    getSuitePage: vi.fn(async () => ({
+      suites: [],
+      total: 0,
+      limit: 10,
+      offset: 0,
+    })),
     getSuite: vi.fn(async () => createSuite('completed')),
     startSuite: vi.fn(async () => createSuite('pending')),
     cancelSuite: vi.fn(async () => undefined),
+    deleteSuite: vi.fn(async () => undefined),
     subscribeSuite: vi.fn(() => () => undefined),
   };
 }

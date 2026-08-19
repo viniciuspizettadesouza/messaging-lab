@@ -6,6 +6,8 @@ import { mapRunRows, type RunRow } from './run-row-mappers.js';
 
 const row: RunRow = {
   id: '11111111-1111-4111-8111-111111111111',
+  name: null,
+  description: null,
   broker: 'redis',
   scenario: 'competing-consumers',
   message_count: BENCHMARK_DEFAULTS.messageCount,

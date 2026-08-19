@@ -43,7 +43,7 @@ describe('openDatabase', () => {
 
     expect(secondRepository.getById(created.id)).toEqual(created);
     expect(secondDatabase.prepare('PRAGMA user_version').get()).toMatchObject({
-      user_version: 3,
+      user_version: 4,
     });
     secondDatabase.close();
   });
@@ -51,7 +51,7 @@ describe('openDatabase', () => {
   it('applies pending migrations once and keeps the schema current', () => {
     const database = openDatabase(':memory:');
     expect(database.prepare('PRAGMA user_version').get()).toEqual({
-      user_version: 3,
+      user_version: 4,
     });
     expect(() => migrateDatabase(database)).not.toThrow();
     expect(
@@ -87,7 +87,7 @@ describe('openDatabase', () => {
     migrateDatabase(database);
 
     expect(database.prepare('PRAGMA user_version').get()).toEqual({
-      user_version: 3,
+      user_version: 4,
     });
     expect(
       database.prepare('SELECT COUNT(*) AS count FROM runs').get(),
@@ -151,6 +151,6 @@ describe('openDatabase', () => {
     futureDatabase.exec('PRAGMA user_version = 999;');
     futureDatabase.close();
 
-    expect(() => openDatabase(path)).toThrow('newer than supported version 3');
+    expect(() => openDatabase(path)).toThrow('newer than supported version 4');
   });
 });

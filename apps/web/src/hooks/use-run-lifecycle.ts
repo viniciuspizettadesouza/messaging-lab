@@ -118,14 +118,14 @@ export function useRunLifecycle({
   }, [api, onError, selectedRun]);
 
   const selectRun = useCallback(
-    (run: Run) => {
-      if (run.id !== selectedRunRef.current?.id) {
+    (run: Run | null) => {
+      if (run?.id !== selectedRunRef.current?.id) {
         stopSubscription();
         setProgress(null);
         setDisconnected(false);
       }
       setSelectedRun(run);
-      if (run.status === 'pending' || run.status === 'running')
+      if (run && (run.status === 'pending' || run.status === 'running'))
         watchRun(run.id);
     },
     [stopSubscription, watchRun],

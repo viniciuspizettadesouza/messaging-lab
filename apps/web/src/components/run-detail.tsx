@@ -13,6 +13,7 @@ interface RunDetailProps {
   readonly progress: Extract<RunEvent, { type: 'progress' }> | null;
   readonly disconnected: boolean;
   readonly onCancel: () => Promise<void>;
+  readonly onDelete: () => Promise<void>;
 }
 
 export function RunDetail({
@@ -20,6 +21,7 @@ export function RunDetail({
   progress,
   disconnected,
   onCancel,
+  onDelete,
 }: RunDetailProps) {
   if (!run) {
     return (
@@ -47,10 +49,17 @@ export function RunDetail({
         <div>
           <p className="eyebrow">Run {run.id.slice(0, 8)}</p>
           <h2 id="run-detail-heading">
-            {BROKER_LABELS[run.configuration.broker]} ·{' '}
-            {SCENARIO_LABELS[run.configuration.scenario]}
+            {run.name ??
+              `${BROKER_LABELS[run.configuration.broker]} · ${SCENARIO_LABELS[run.configuration.scenario]}`}
           </h2>
+          {run.name ? (
+            <p className="muted">
+              {BROKER_LABELS[run.configuration.broker]} ·{' '}
+              {SCENARIO_LABELS[run.configuration.scenario]}
+            </p>
+          ) : null}
           <p className="muted">Started {formatDate(run.createdAt)}</p>
+          {run.description ? <p>{run.description}</p> : null}
         </div>
         <StatusBadge status={run.status} />
       </div>
@@ -91,6 +100,15 @@ export function RunDetail({
             Cancel run
           </button>
         </div>
+      ) : null}
+      {!active ? (
+        <button
+          className="danger-button history-delete"
+          type="button"
+          onClick={() => void onDelete()}
+        >
+          Delete run
+        </button>
       ) : null}
 
       {run.metrics ? (

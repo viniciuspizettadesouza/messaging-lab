@@ -18,6 +18,7 @@ interface SuiteDetailProps {
   readonly disconnected: boolean;
   readonly onCancel: () => Promise<void>;
   readonly onSelectRun: (run: Run) => void;
+  readonly onDelete: () => Promise<void>;
 }
 
 export function SuiteDetail({
@@ -25,6 +26,7 @@ export function SuiteDetail({
   disconnected,
   onCancel,
   onSelectRun,
+  onDelete,
 }: SuiteDetailProps) {
   const active = suite.status === 'pending' || suite.status === 'running';
   const completed = suite.progress.completedRuns;
@@ -47,6 +49,7 @@ export function SuiteDetail({
           <p className="eyebrow">Suite {suite.id.slice(0, 8)}</p>
           <h2 id="suite-detail-heading">{suite.name}</h2>
           <p className="muted">Created {formatDate(suite.createdAt)}</p>
+          {suite.description ? <p>{suite.description}</p> : null}
         </div>
         <StatusBadge status={suite.status} />
       </div>
@@ -58,6 +61,15 @@ export function SuiteDetail({
             The server-managed suite is still running. Reload to reconnect.
           </span>
         </div>
+      ) : null}
+      {!active ? (
+        <button
+          className="danger-button history-delete"
+          type="button"
+          onClick={() => void onDelete()}
+        >
+          Delete suite
+        </button>
       ) : null}
 
       <div

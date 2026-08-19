@@ -157,13 +157,13 @@ export function useSuiteLifecycle({
   }, [api, onError, selectedSuite]);
 
   const selectSuite = useCallback(
-    (suite: Suite) => {
-      if (suite.id !== selectedSuiteRef.current?.id) {
+    (suite: Suite | null) => {
+      if (suite?.id !== selectedSuiteRef.current?.id) {
         stopSubscription();
         setDisconnected(false);
       }
       setSelectedSuite(suite);
-      if (suite.status === 'pending' || suite.status === 'running') {
+      if (suite && (suite.status === 'pending' || suite.status === 'running')) {
         watchSuite(suite.id);
       }
     },

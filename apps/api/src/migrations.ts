@@ -116,6 +116,24 @@ export const migrations: readonly Migration[] = [
       ) STRICT;
     `,
   },
+  {
+    version: 4,
+    name: 'named experiment history',
+    sql: `
+      ALTER TABLE runs ADD COLUMN name TEXT CHECK (
+        name IS NULL OR length(name) BETWEEN 1 AND 120
+      );
+      ALTER TABLE runs ADD COLUMN description TEXT CHECK (
+        description IS NULL OR length(description) <= 500
+      );
+      ALTER TABLE suites ADD COLUMN description TEXT CHECK (
+        description IS NULL OR length(description) <= 500
+      );
+      CREATE INDEX runs_scenario_idx ON runs (scenario);
+      CREATE INDEX runs_created_at_filter_idx ON runs (created_at);
+      CREATE INDEX suite_runs_suite_id_run_id_idx ON suite_runs (suite_id, run_id);
+    `,
+  },
 ];
 
 export function migrateDatabase(database: DatabaseSync): void {

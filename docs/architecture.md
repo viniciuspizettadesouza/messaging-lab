@@ -184,3 +184,10 @@ An API restart marks pending/running runs as failed and pending/running suites
 as stopped. Automatic suite continuation is intentionally disabled because a
 restart may change the benchmark environment. Graceful suite cancellation and
 shutdown abort both cooldown timers and any active trial.
+
+History deletion is separate from broker cleanup. Only terminal standalone
+runs or terminal suites can be deleted. Suite deletion uses one SQLite
+transaction to remove suite metadata and its owned runs; foreign keys cascade
+run metrics, notes, and errors. Delete endpoints never address broker resources
+because cleanup belongs to the run lifecycle and persisted resource names may
+already have been removed or reused.

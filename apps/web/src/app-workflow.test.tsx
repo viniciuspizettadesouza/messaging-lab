@@ -29,7 +29,14 @@ describe('dashboard workflows', () => {
     const runs = new Promise<Run[]>((resolve) => {
       resolveRuns = resolve;
     });
-    const api = createApi({ getRuns: vi.fn(() => runs) });
+    const api = createApi({
+      getRunPage: vi.fn(async () => ({
+        runs: await runs,
+        total: 0,
+        limit: 10,
+        offset: 0,
+      })),
+    });
     render(<App api={api} />);
 
     expect(screen.getByText('Connecting to the lab…')).toBeInTheDocument();
@@ -46,10 +53,15 @@ describe('dashboard workflows', () => {
     const api = createApi({
       startRun: vi.fn(async () => pending),
       getRun: vi.fn(async () => completed),
-      getRuns: vi
+      getRunPage: vi
         .fn()
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([completed]),
+        .mockResolvedValueOnce({ runs: [], total: 0, limit: 10, offset: 0 })
+        .mockResolvedValueOnce({
+          runs: [completed],
+          total: 1,
+          limit: 10,
+          offset: 0,
+        }),
     });
     render(<App api={api} />);
     const user = userEvent.setup();
@@ -91,16 +103,24 @@ describe('dashboard workflows', () => {
     const api = createApi({
       startSuite: vi.fn(async () => pending),
       getSuite: vi.fn(async () => completed),
-      getSuites: vi
+      getSuitePage: vi
         .fn()
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([completed]),
-      getRuns: vi
+        .mockResolvedValueOnce({ suites: [], total: 0, limit: 10, offset: 0 })
+        .mockResolvedValueOnce({
+          suites: [completed],
+          total: 1,
+          limit: 10,
+          offset: 0,
+        }),
+      getRunPage: vi
         .fn()
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce(
-          completed.runs.flatMap(({ run }) => (run ? [run] : [])),
-        ),
+        .mockResolvedValueOnce({ runs: [], total: 0, limit: 10, offset: 0 })
+        .mockResolvedValueOnce({
+          runs: completed.runs.flatMap(({ run }) => (run ? [run] : [])),
+          total: 2,
+          limit: 10,
+          offset: 0,
+        }),
     });
     render(<App api={api} />);
 
@@ -159,7 +179,14 @@ describe('dashboard workflows', () => {
 
   it('restores an active suite after reload and cancels it through the suite API', async () => {
     const running = createSuite('running', ['running']);
-    const api = createApi({ getSuites: vi.fn(async () => [running]) });
+    const api = createApi({
+      getSuitePage: vi.fn(async () => ({
+        suites: [running],
+        total: 1,
+        limit: 10,
+        offset: 0,
+      })),
+    });
     render(<App api={api} />);
 
     expect(
@@ -180,10 +207,18 @@ describe('dashboard workflows', () => {
     const completed = createSuite('completed', ['completed', 'failed']);
     window.history.replaceState(null, '', `/?suite=${completed.id}`);
     const api = createApi({
-      getSuites: vi.fn(async () => [completed]),
-      getRuns: vi.fn(async () =>
-        completed.runs.flatMap(({ run }) => (run ? [run] : [])),
-      ),
+      getSuitePage: vi.fn(async () => ({
+        suites: [completed],
+        total: 1,
+        limit: 10,
+        offset: 0,
+      })),
+      getRunPage: vi.fn(async () => ({
+        runs: completed.runs.flatMap(({ run }) => (run ? [run] : [])),
+        total: 2,
+        limit: 10,
+        offset: 0,
+      })),
     });
     render(<App api={api} />);
 
@@ -196,6 +231,57 @@ describe('dashboard workflows', () => {
     expect(
       screen.getByRole('heading', { name: /Redis · Live fan-out/ }),
     ).toBeInTheDocument();
+  });
+
+  it('synchronizes paginated history filters with the URL', async () => {
+    const api = createApi({
+      getRunPage: vi.fn(async () => ({
+        runs: [],
+        total: 25,
+        limit: 10,
+        offset: 0,
+      })),
+      getSuitePage: vi.fn(async () => ({
+        suites: [],
+        total: 0,
+        limit: 10,
+        offset: 0,
+      })),
+    });
+    render(<App api={api} />);
+    await screen.findByText('No experiments yet.');
+
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: 'Broker' }),
+      'kafka',
+    );
+    expect(window.location.search).toContain('broker=kafka');
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(window.location.search).toContain('page=2');
+    expect(api.getRunPage).toHaveBeenCalledWith(
+      expect.objectContaining({ broker: 'kafka', offset: 10, limit: 10 }),
+    );
+  });
+
+  it('deletes the selected terminal run after confirmation', async () => {
+    const completed = { ...createRun('completed'), name: 'Delete me' };
+    const api = createApi({
+      getRunPage: vi.fn(async () => ({
+        runs: [completed],
+        total: 1,
+        limit: 10,
+        offset: 0,
+      })),
+    });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<App api={api} />);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete me' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Delete run' }));
+    expect(api.deleteRun).toHaveBeenCalledWith(completed.id);
+    expect(window.location.search).not.toContain('run=');
   });
 });
 
@@ -212,9 +298,16 @@ function createApi(overrides: Partial<DashboardApi> = {}): FakeApi {
   return {
     getBrokers: vi.fn(async () => brokers),
     getRuns: vi.fn(async () => []),
+    getRunPage: vi.fn(async () => ({
+      runs: [],
+      total: 0,
+      limit: 10,
+      offset: 0,
+    })),
     getRun: vi.fn(async () => createRun('completed')),
     startRun: vi.fn(async () => createRun('pending')),
     cancelRun: vi.fn(async () => undefined),
+    deleteRun: vi.fn(async () => undefined),
     subscribe: vi.fn((_id, handlers) => {
       runHandlers = handlers;
       return () => {
@@ -222,11 +315,18 @@ function createApi(overrides: Partial<DashboardApi> = {}): FakeApi {
       };
     }),
     getSuites: vi.fn(async () => []),
+    getSuitePage: vi.fn(async () => ({
+      suites: [],
+      total: 0,
+      limit: 10,
+      offset: 0,
+    })),
     getSuite: vi.fn(async () =>
       createSuite('completed', ['completed', 'completed']),
     ),
     startSuite: vi.fn(async () => createSuite('pending')),
     cancelSuite: vi.fn(async () => undefined),
+    deleteSuite: vi.fn(async () => undefined),
     subscribeSuite: vi.fn((_id, handlers) => {
       suiteHandlers = handlers;
       return () => {

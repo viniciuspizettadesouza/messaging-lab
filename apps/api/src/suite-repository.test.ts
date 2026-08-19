@@ -73,6 +73,10 @@ describe('SuiteRepository', () => {
       ...firstCombination,
     });
     suites.attachRun(suite.id, 0, run.id);
+    expect(runs.list({ suite: suite.id, limit: 20, offset: 0 })).toMatchObject({
+      total: 1,
+      runs: [{ id: run.id }],
+    });
     runs.updateStatus(run.id, 'running');
     runs.updateStatus(run.id, 'completed');
     const completed = suites.updateStatus(suite.id, 'completed');
@@ -135,5 +139,40 @@ describe('SuiteRepository', () => {
       ),
     ).toThrow('execution order');
     expect(suites.list({ limit: 20, offset: 0 }).total).toBe(0);
+  });
+
+  it('filters suite combinations and cascades deletion to owned runs', () => {
+    const suite = suites.create(
+      'Deletable',
+      configuration,
+      order,
+      testEnvironmentSnapshot,
+      'Suite description',
+    );
+    const run = runs.create({
+      ...configuration.workload,
+      ...configuration.combinations[0]!,
+    });
+    suites.attachRun(suite.id, 0, run.id);
+    runs.updateStatus(run.id, 'completed');
+    suites.updateStatus(suite.id, 'completed');
+
+    expect(
+      suites.list({
+        broker: 'redis',
+        scenario: 'competing-consumers',
+        dateFrom: '2026-08-19',
+        dateTo: '2026-08-19',
+        limit: 20,
+        offset: 0,
+      }),
+    ).toMatchObject({
+      total: 1,
+      suites: [{ description: 'Suite description' }],
+    });
+    expect(() => runs.deleteStandalone(run.id)).toThrow('Suite-owned');
+    expect(suites.delete(suite.id)).toBe(1);
+    expect(suites.getById(suite.id)).toBeNull();
+    expect(runs.getById(run.id)).toBeNull();
   });
 });

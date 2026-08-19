@@ -11,6 +11,8 @@ import {
   type RunConfiguration,
   type RunError,
   type RunStatus,
+  type ScenarioId,
+  type SuiteId,
 } from '@messaging-lab/shared';
 import {
   mapRunRows,
@@ -23,6 +25,10 @@ import {
 export interface ListRunsOptions {
   readonly broker?: BrokerId;
   readonly status?: RunStatus;
+  readonly scenario?: ScenarioId;
+  readonly suite?: SuiteId;
+  readonly dateFrom?: string;
+  readonly dateTo?: string;
   readonly limit: number;
   readonly offset: number;
 }
@@ -46,7 +52,13 @@ export class RunRepository {
     private readonly createId: () => string = randomUUID,
   ) {}
 
-  public create(configuration: RunConfiguration): Run {
+  public create(
+    configuration: RunConfiguration,
+    metadata: {
+      readonly name?: string | null;
+      readonly description?: string | null;
+    } = {},
+  ): Run {
     const id = this.createId();
     const createdAt = this.now().toISOString();
 
@@ -54,8 +66,9 @@ export class RunRepository {
       .prepare(
         `INSERT INTO runs (
           id, broker, scenario, message_count, payload_size_bytes,
-          producer_concurrency, consumer_count, timeout_ms, status, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+          producer_concurrency, consumer_count, timeout_ms, status, created_at,
+          name, description
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
       )
       .run(
         id,
@@ -67,6 +80,8 @@ export class RunRepository {
         configuration.consumerCount,
         configuration.timeoutMs,
         createdAt,
+        metadata.name ?? null,
+        metadata.description ?? null,
       );
 
     return this.requireById(id);
@@ -102,6 +117,24 @@ export class RunRepository {
     if (options.status) {
       conditions.push('status = ?');
       values.push(options.status);
+    }
+    if (options.scenario) {
+      conditions.push('scenario = ?');
+      values.push(options.scenario);
+    }
+    if (options.suite) {
+      conditions.push(
+        'id IN (SELECT run_id FROM suite_runs WHERE suite_id = ? AND run_id IS NOT NULL)',
+      );
+      values.push(options.suite);
+    }
+    if (options.dateFrom) {
+      conditions.push('created_at >= ?');
+      values.push(`${options.dateFrom}T00:00:00.000Z`);
+    }
+    if (options.dateTo) {
+      conditions.push('created_at <= ?');
+      values.push(`${options.dateTo}T23:59:59.999Z`);
     }
 
     const whereClause =
@@ -252,6 +285,23 @@ export class RunRepository {
       this.database.exec('ROLLBACK;');
       throw error;
     }
+  }
+
+  public deleteStandalone(id: string): boolean {
+    const run = this.getById(id);
+    if (!run) return false;
+    if (!TERMINAL_STATUSES.has(run.status)) {
+      throw new Error('Only terminal runs can be deleted.');
+    }
+    const membership = this.database
+      .prepare('SELECT suite_id FROM suite_runs WHERE run_id = ?')
+      .get(id);
+    if (membership) {
+      throw new Error('Suite-owned runs must be deleted with their suite.');
+    }
+    return (
+      this.database.prepare('DELETE FROM runs WHERE id = ?').run(id).changes > 0
+    );
   }
 
   private hydrateRun(row: RunRow): Run {

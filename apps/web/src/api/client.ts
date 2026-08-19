@@ -3,6 +3,7 @@ import {
   cancelRunResponseSchema,
   cancelSuiteResponseSchema,
   createSuiteRequestSchema,
+  deleteExperimentResponseSchema,
   runEventSchema,
   runResponseSchema,
   runsResponseSchema,
@@ -17,6 +18,8 @@ import {
   type CreateSuiteRequest,
   type Suite,
   type SuiteEvent,
+  type RunsResponse,
+  type SuitesResponse,
 } from '@messaging-lab/shared';
 
 import {
@@ -35,17 +38,32 @@ export interface SuiteEventHandlers {
   readonly onDisconnect: () => void;
 }
 
+export interface HistoryQuery {
+  readonly broker?: string;
+  readonly scenario?: string;
+  readonly status?: string;
+  readonly suite?: string;
+  readonly dateFrom?: string;
+  readonly dateTo?: string;
+  readonly limit: number;
+  readonly offset: number;
+}
+
 export interface DashboardApi {
   getBrokers(): Promise<BrokerInfo[]>;
   getRuns(): Promise<Run[]>;
+  getRunPage(query: HistoryQuery): Promise<RunsResponse>;
   getRun(runId: string): Promise<Run>;
   startRun(request: StartRunRequest): Promise<Run>;
   cancelRun(runId: string): Promise<void>;
+  deleteRun(runId: string): Promise<void>;
   subscribe(runId: string, handlers: RunEventHandlers): () => void;
   getSuites(): Promise<Suite[]>;
+  getSuitePage(query: HistoryQuery): Promise<SuitesResponse>;
   getSuite(suiteId: string): Promise<Suite>;
   startSuite(request: CreateSuiteRequest): Promise<Suite>;
   cancelSuite(suiteId: string): Promise<void>;
+  deleteSuite(suiteId: string): Promise<void>;
   subscribeSuite(suiteId: string, handlers: SuiteEventHandlers): () => void;
 }
 
@@ -58,8 +76,14 @@ export class ApiClient implements DashboardApi {
   }
 
   public async getRuns(): Promise<Run[]> {
-    const response = await requestJson(`${this.baseUrl}/api/runs?limit=100`);
-    return parseResponse(runsResponseSchema, response).runs;
+    return (await this.getRunPage({ limit: 100, offset: 0 })).runs;
+  }
+
+  public async getRunPage(query: HistoryQuery): Promise<RunsResponse> {
+    const response = await requestJson(
+      `${this.baseUrl}/api/runs?${historyParameters(query, true)}`,
+    );
+    return parseResponse(runsResponseSchema, response);
   }
 
   public async getRun(runId: string): Promise<Run> {
@@ -90,6 +114,15 @@ export class ApiClient implements DashboardApi {
     );
   }
 
+  public async deleteRun(runId: string): Promise<void> {
+    parseResponse(
+      deleteExperimentResponseSchema,
+      await requestJson(`${this.baseUrl}/api/runs/${runId}`, {
+        method: 'DELETE',
+      }),
+    );
+  }
+
   public subscribe(runId: string, handlers: RunEventHandlers): () => void {
     const source = new EventSource(`${this.baseUrl}/api/runs/${runId}/events`);
     const eventTypes = ['status', 'progress', 'metrics', 'error'] as const;
@@ -110,8 +143,14 @@ export class ApiClient implements DashboardApi {
   }
 
   public async getSuites(): Promise<Suite[]> {
-    const response = await requestJson(`${this.baseUrl}/api/suites?limit=100`);
-    return parseResponse(suitesResponseSchema, response).suites;
+    return (await this.getSuitePage({ limit: 100, offset: 0 })).suites;
+  }
+
+  public async getSuitePage(query: HistoryQuery): Promise<SuitesResponse> {
+    const response = await requestJson(
+      `${this.baseUrl}/api/suites?${historyParameters(query, true)}`,
+    );
+    return parseResponse(suitesResponseSchema, response);
   }
 
   public async getSuite(suiteId: string): Promise<Suite> {
@@ -138,6 +177,15 @@ export class ApiClient implements DashboardApi {
       cancelSuiteResponseSchema,
       await requestJson(`${this.baseUrl}/api/suites/${suiteId}/cancel`, {
         method: 'POST',
+      }),
+    );
+  }
+
+  public async deleteSuite(suiteId: string): Promise<void> {
+    parseResponse(
+      deleteExperimentResponseSchema,
+      await requestJson(`${this.baseUrl}/api/suites/${suiteId}`, {
+        method: 'DELETE',
       }),
     );
   }
@@ -172,6 +220,24 @@ export class ApiClient implements DashboardApi {
     source.onerror = () => handlers.onDisconnect();
     return () => source.close();
   }
+}
+
+function historyParameters(query: HistoryQuery, includeSuite: boolean): string {
+  const parameters = new URLSearchParams();
+  for (const key of [
+    'broker',
+    'scenario',
+    'status',
+    'dateFrom',
+    'dateTo',
+  ] as const) {
+    const value = query[key];
+    if (value) parameters.set(key, value);
+  }
+  if (includeSuite && query.suite) parameters.set('suite', query.suite);
+  parameters.set('limit', String(query.limit));
+  parameters.set('offset', String(query.offset));
+  return parameters.toString();
 }
 
 async function requestJson(url: string, init?: RequestInit): Promise<unknown> {
