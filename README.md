@@ -121,6 +121,7 @@ The Docker-backed commands require a running Docker daemon. The smoke test uses 
 - [Local development](docs/local-development.md)
 - [Architecture and messaging flows](docs/architecture.md)
 - [Benchmark methodology and interpretation](docs/benchmark-methodology.md)
+- [Messaging glossary](docs/glossary.md)
 - [HTTP API and environment variables](docs/api.md)
 
 ## License

@@ -1,12 +1,14 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { BENCHMARK_DEFAULTS } from '@messaging-lab/shared';
 
 import { openDatabase } from './database.js';
+import { migrateDatabase } from './migrations.js';
 import { RunRepository } from './run-repository.js';
 
 const temporaryDirectories: string[] = [];
@@ -43,5 +45,32 @@ describe('openDatabase', () => {
       user_version: 1,
     });
     secondDatabase.close();
+  });
+
+  it('applies pending migrations once and keeps the schema current', () => {
+    const database = openDatabase(':memory:');
+    expect(database.prepare('PRAGMA user_version').get()).toEqual({
+      user_version: 1,
+    });
+    expect(() => migrateDatabase(database)).not.toThrow();
+    expect(
+      database
+        .prepare(
+          "SELECT COUNT(*) AS count FROM sqlite_master WHERE name = 'runs'",
+        )
+        .get(),
+    ).toEqual({ count: 1 });
+    database.close();
+  });
+
+  it('refuses a database created by a newer application version', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'messaging-lab-api-'));
+    temporaryDirectories.push(directory);
+    const path = join(directory, 'future.sqlite');
+    const futureDatabase = new DatabaseSync(path);
+    futureDatabase.exec('PRAGMA user_version = 999;');
+    futureDatabase.close();
+
+    expect(() => openDatabase(path)).toThrow('newer than supported version 1');
   });
 });

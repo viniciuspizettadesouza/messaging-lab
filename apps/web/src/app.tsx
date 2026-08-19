@@ -6,7 +6,6 @@ import {
   type BrokerId,
   type BrokerInfo,
   type Run,
-  type RunEvent,
   type ScenarioId,
   type StartRunRequest,
 } from '@messaging-lab/shared';
@@ -21,15 +20,9 @@ import {
 } from './components/experiment-form.js';
 import { RunDetail } from './components/run-detail.js';
 import { RunHistory } from './components/run-history.js';
+import { useRunLifecycle } from './hooks/use-run-lifecycle.js';
 
 const defaultApi = new ApiClient();
-const terminalStatuses = new Set([
-  'completed',
-  'failed',
-  'timed-out',
-  'cancelled',
-]);
-
 interface BatchQueue {
   completed: number;
   readonly total: number;
@@ -39,18 +32,11 @@ interface BatchQueue {
 export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
   const [brokers, setBrokers] = useState<BrokerInfo[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
-  const [selectedRun, setSelectedRun] = useState<Run | null>(null);
-  const [progress, setProgress] = useState<Extract<
-    RunEvent,
-    { type: 'progress' }
-  > | null>(null);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState<string | null>(null);
-  const [disconnected, setDisconnected] = useState(false);
   const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(
     null,
   );
-  const unsubscribeRef = useRef<(() => void) | null>(null);
   const batchQueueRef = useRef<BatchQueue | null>(null);
   const advanceBatchRef = useRef<() => void>(() => undefined);
 
@@ -60,57 +46,26 @@ export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
     return nextRuns;
   }, [api]);
 
-  const stopSubscription = useCallback(() => {
-    unsubscribeRef.current?.();
-    unsubscribeRef.current = null;
+  const reportError = useCallback((error: unknown) => {
+    setPageError(errorMessage(error));
   }, []);
-
-  const finishRun = useCallback(
-    async (runId: string) => {
-      stopSubscription();
-      try {
-        const [run] = await Promise.all([api.getRun(runId), refreshRuns()]);
-        setSelectedRun(run);
-      } catch (error) {
-        setPageError(errorMessage(error));
-      }
-    },
-    [api, refreshRuns, stopSubscription],
-  );
-
-  const watchRun = useCallback(
-    (runId: string) => {
-      stopSubscription();
-      setDisconnected(false);
-      unsubscribeRef.current = api.subscribe(runId, {
-        onDisconnect: () => setDisconnected(true),
-        onEvent: (event) => {
-          if (event.type === 'progress') setProgress(event);
-          if (event.type === 'metrics') {
-            setSelectedRun((current) =>
-              current ? { ...current, metrics: event.metrics } : current,
-            );
-          }
-          if (event.type === 'error') {
-            setSelectedRun((current) =>
-              current
-                ? { ...current, errors: [...current.errors, event.error] }
-                : current,
-            );
-          }
-          if (event.type === 'status') {
-            setSelectedRun((current) =>
-              current ? { ...current, status: event.status } : current,
-            );
-            if (terminalStatuses.has(event.status)) {
-              void finishRun(runId).finally(() => advanceBatchRef.current());
-            }
-          }
-        },
-      });
-    },
-    [api, finishRun, stopSubscription],
-  );
+  const addRun = useCallback((run: Run) => {
+    setRuns((current) => [run, ...current.filter(({ id }) => id !== run.id)]);
+  }, []);
+  const {
+    selectedRun,
+    progress,
+    disconnected,
+    launchRun,
+    cancelRun: cancelSelectedRun,
+    selectRun,
+  } = useRunLifecycle({
+    api,
+    refreshRuns,
+    addRun,
+    onError: reportError,
+    onTerminal: () => advanceBatchRef.current(),
+  });
 
   useEffect(() => {
     let active = true;
@@ -123,8 +78,7 @@ export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
           (run) => run.status === 'pending' || run.status === 'running',
         );
         if (activeRun) {
-          setSelectedRun(activeRun);
-          watchRun(activeRun.id);
+          selectRun(activeRun);
         }
       })
       .catch((error: unknown) => {
@@ -135,31 +89,8 @@ export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
       });
     return () => {
       active = false;
-      stopSubscription();
     };
-  }, [api, stopSubscription, watchRun]);
-
-  const launchRun = useCallback(
-    async (request: StartRunRequest): Promise<boolean> => {
-      setPageError(null);
-      setProgress(null);
-      setDisconnected(false);
-      try {
-        const run = await api.startRun(request);
-        setSelectedRun(run);
-        setRuns((current) => [
-          run,
-          ...current.filter(({ id }) => id !== run.id),
-        ]);
-        watchRun(run.id);
-        return true;
-      } catch (error) {
-        setPageError(errorMessage(error));
-        return false;
-      }
-    },
-    [api, watchRun],
-  );
+  }, [api, selectRun]);
 
   const advanceBatch = useCallback(async () => {
     const batch = batchQueueRef.current;
@@ -204,10 +135,12 @@ export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
   async function startRun(request: StartRunRequest): Promise<void> {
     batchQueueRef.current = null;
     setBatchProgress(null);
+    setPageError(null);
     await launchRun(request);
   }
 
   async function runAll(request: StartRunRequest): Promise<void> {
+    setPageError(null);
     const configurations = BROKER_IDS.flatMap((broker: BrokerId) =>
       SCENARIO_IDS.map((scenario: ScenarioId) => ({
         ...request,
@@ -249,21 +182,7 @@ export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
       });
     }
     setPageError(null);
-    try {
-      await api.cancelRun(selectedRun.id);
-    } catch (error) {
-      setPageError(errorMessage(error));
-    }
-  }
-
-  function selectRun(run: Run): void {
-    if (run.id !== selectedRun?.id) {
-      stopSubscription();
-      setProgress(null);
-      setDisconnected(false);
-    }
-    setSelectedRun(run);
-    if (run.status === 'pending' || run.status === 'running') watchRun(run.id);
+    await cancelSelectedRun();
   }
 
   const active =

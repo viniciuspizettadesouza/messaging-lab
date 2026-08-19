@@ -1,10 +1,12 @@
-import type { BrokerId, Run, ScenarioId } from '@messaging-lab/shared';
+import type { Run } from '@messaging-lab/shared';
 
 import { BROKER_LABELS, formatNumber } from '../format.js';
+import { selectComparisonGroups } from '../selectors/comparison.js';
 
 export function ComparisonCharts({ runs }: { readonly runs: Run[] }) {
-  const latest = latestCompletedRuns(runs);
-  if (latest.size === 0) {
+  const groups = selectComparisonGroups(runs);
+  const hasResults = Object.values(groups).some((group) => group.length > 0);
+  if (!hasResults) {
     return (
       <section className="section-block" aria-labelledby="comparison-heading">
         <div className="section-heading">
@@ -21,16 +23,7 @@ export function ComparisonCharts({ runs }: { readonly runs: Run[] }) {
     );
   }
 
-  const pubSub = latest.get(runKey('redis', 'fan-out'));
-  const durableFanOut = compact([
-    latest.get(runKey('kafka', 'fan-out')),
-    latest.get(runKey('rabbitmq', 'fan-out')),
-  ]);
-  const competingConsumers = compact([
-    latest.get(runKey('redis', 'competing-consumers')),
-    latest.get(runKey('kafka', 'competing-consumers')),
-    latest.get(runKey('rabbitmq', 'competing-consumers')),
-  ]);
+  const pubSub = groups.ephemeralLive[0];
 
   return (
     <>
@@ -49,13 +42,13 @@ export function ComparisonCharts({ runs }: { readonly runs: Run[] }) {
           label="Durable fan-out comparison"
           title="Durable fan-out"
           description="Kafka and RabbitMQ deliver to independent durable subscribers. Kafka supports retained-log replay; RabbitMQ does not."
-          runs={durableFanOut}
+          runs={groups.durableFanOut}
         />
         <ComparisonGroup
           label="Durable competing-consumer comparison"
           title="Durable competing consumers"
           description="Redis Streams, Kafka, and RabbitMQ distribute acknowledged work. Replay and retention behavior still differ."
-          runs={competingConsumers}
+          runs={groups.durableCompetingConsumers}
         />
       </section>
 
@@ -199,27 +192,4 @@ function ResultMetric({
       <strong>{value}</strong>
     </div>
   );
-}
-
-function latestCompletedRuns(runs: readonly Run[]): Map<string, Run> {
-  const latest = new Map<string, Run>();
-  const newestFirst = [...runs].sort(
-    (left, right) =>
-      new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
-  );
-
-  for (const run of newestFirst) {
-    if (run.status !== 'completed' || !run.metrics) continue;
-    const key = runKey(run.configuration.broker, run.configuration.scenario);
-    if (!latest.has(key)) latest.set(key, run);
-  }
-  return latest;
-}
-
-function runKey(broker: BrokerId, scenario: ScenarioId): string {
-  return `${broker}:${scenario}`;
-}
-
-function compact(values: Array<Run | undefined>): Run[] {
-  return values.filter((run): run is Run => Boolean(run));
 }

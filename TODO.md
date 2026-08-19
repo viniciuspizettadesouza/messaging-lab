@@ -18,15 +18,15 @@ This checklist continues from the completed MVP. Items are ordered by dependency
 
 ## 10. Phase 2 foundations
 
-- [ ] Extract individual-run lifecycle and SSE handling from `App` into a focused hook or controller.
-- [ ] Extract comparison grouping and latest-result selection into pure, unit-tested selectors.
-- [ ] Preserve runtime Zod validation when suite and experiment contracts are added.
-- [ ] Preserve structured API error codes in the web client instead of reducing errors to message strings.
-- [ ] Split the broad web test file into component and workflow test files.
-- [ ] Add versioned SQLite migration infrastructure and migration tests.
-- [ ] Extract typed database row-mapping helpers from the repository layer.
-- [ ] Review broker adapters for small shared lifecycle and cleanup utilities without hiding broker semantics.
-- [ ] Document terminology for ephemeral, durable, fan-out, competing consumers, recovery, and replay.
+- [x] Extract individual-run lifecycle and SSE handling from `App` into a focused hook or controller.
+- [x] Extract comparison grouping and latest-result selection into pure, unit-tested selectors.
+- [x] Preserve runtime Zod validation when suite and experiment contracts are added.
+- [x] Preserve structured API error codes in the web client instead of reducing errors to message strings.
+- [x] Split the broad web test file into component and workflow test files.
+- [x] Add versioned SQLite migration infrastructure and migration tests.
+- [x] Extract typed database row-mapping helpers from the repository layer.
+- [x] Review broker adapters for small shared lifecycle and cleanup utilities without hiding broker semantics.
+- [x] Document terminology for ephemeral, durable, fan-out, competing consumers, recovery, and replay.
 
 ## 11. Persistent benchmark suites
 

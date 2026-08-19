@@ -29,7 +29,10 @@ flowchart TB
     Engine --> RabbitMQ[(RabbitMQ)]
 ```
 
-The shared workspace owns the Zod schemas consumed by both applications. API responses and incoming SSE events are validated at the web boundary.
+The shared workspace owns the Zod schemas consumed by both applications. API
+responses and incoming SSE events are validated at the web boundary. Validation
+failures and structured server errors remain distinct from connectivity,
+conflict, timeout, and broker failures in the client.
 
 ## Current sequential runner
 
@@ -153,4 +156,10 @@ One consumer handles each message. Distribution depends on consumer readiness, b
 
 ## Persistence model
 
-SQLite stores one run row, one optional aggregate-metrics row, capability notes, and run errors. Individual message timings are deliberately kept out of the database. Named Docker volumes retain SQLite and broker data across ordinary `docker compose down` and restart operations.
+SQLite stores one run row, one optional aggregate-metrics row, capability notes,
+and run errors. Versioned, transactional migrations advance `user_version`
+before repositories access the database; a database from a newer application
+version is rejected. Typed row mappers translate storage columns into the
+shared runtime-validated domain model. Individual message timings are
+deliberately kept out of the database. Named Docker volumes retain SQLite and
+broker data across ordinary `docker compose down` and restart operations.

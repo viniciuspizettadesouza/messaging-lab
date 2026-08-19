@@ -11,6 +11,12 @@ import {
   type StartRunRequest,
 } from '@messaging-lab/shared';
 
+import {
+  ApiClientError,
+  classifyServerError,
+  responseValidationError,
+} from './errors.js';
+
 export interface RunEventHandlers {
   readonly onEvent: (event: RunEvent) => void;
   readonly onDisconnect: () => void;
@@ -30,23 +36,25 @@ export class ApiClient implements DashboardApi {
 
   public async getBrokers(): Promise<BrokerInfo[]> {
     const response = await requestJson(`${this.baseUrl}/api/brokers`);
-    return brokersResponseSchema.parse(response).brokers;
+    return parseResponse(brokersResponseSchema, response).brokers;
   }
 
   public async getRuns(): Promise<Run[]> {
     const response = await requestJson(`${this.baseUrl}/api/runs?limit=100`);
-    return runsResponseSchema.parse(response).runs;
+    return parseResponse(runsResponseSchema, response).runs;
   }
 
   public async getRun(runId: string): Promise<Run> {
-    return runResponseSchema.parse(
+    return parseResponse(
+      runResponseSchema,
       await requestJson(`${this.baseUrl}/api/runs/${runId}`),
     );
   }
 
   public async startRun(request: StartRunRequest): Promise<Run> {
     const body = startRunRequestSchema.parse(request);
-    return runResponseSchema.parse(
+    return parseResponse(
+      runResponseSchema,
       await requestJson(`${this.baseUrl}/api/runs`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -56,7 +64,8 @@ export class ApiClient implements DashboardApi {
   }
 
   public async cancelRun(runId: string): Promise<void> {
-    cancelRunResponseSchema.parse(
+    parseResponse(
+      cancelRunResponseSchema,
       await requestJson(`${this.baseUrl}/api/runs/${runId}/cancel`, {
         method: 'POST',
       }),
@@ -70,10 +79,12 @@ export class ApiClient implements DashboardApi {
     for (const type of eventTypes) {
       source.addEventListener(type, (message) => {
         if (!(message instanceof MessageEvent)) return;
-        const result = runEventSchema.safeParse(
-          JSON.parse(String(message.data)),
-        );
-        if (result.success) handlers.onEvent(result.data);
+        try {
+          const result = runEventSchema.parse(JSON.parse(String(message.data)));
+          handlers.onEvent(result);
+        } catch {
+          handlers.onDisconnect();
+        }
       });
     }
     source.onerror = () => handlers.onDisconnect();
@@ -82,20 +93,75 @@ export class ApiClient implements DashboardApi {
 }
 
 async function requestJson(url: string, init?: RequestInit): Promise<unknown> {
-  const response = await fetch(url, init);
-  const body = (await response.json()) as unknown;
+  let response: Response;
+  try {
+    response = await fetch(url, init);
+  } catch (error) {
+    throw new ApiClientError(
+      'connectivity',
+      'NETWORK_ERROR',
+      'Could not connect to the Messaging Lab API.',
+      null,
+      undefined,
+      { cause: error },
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = (await response.json()) as unknown;
+  } catch (error) {
+    throw responseValidationError(error);
+  }
 
   if (!response.ok) {
-    const message =
-      extractErrorMessage(body) ?? `Request failed (${response.status}).`;
-    throw new Error(message);
+    const serverError = extractServerError(body);
+    const code = serverError?.code ?? `HTTP_${response.status}`;
+    throw new ApiClientError(
+      classifyServerError(response.status, code),
+      code,
+      serverError?.message ?? `Request failed (${response.status}).`,
+      response.status,
+      serverError?.details,
+    );
   }
   return body;
 }
 
-function extractErrorMessage(body: unknown): string | null {
+function extractServerError(body: unknown): {
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+} | null {
   if (!body || typeof body !== 'object' || !('error' in body)) return null;
   const error = body.error;
-  if (!error || typeof error !== 'object' || !('message' in error)) return null;
-  return typeof error.message === 'string' ? error.message : null;
+  if (
+    !error ||
+    typeof error !== 'object' ||
+    !('code' in error) ||
+    typeof error.code !== 'string' ||
+    !('message' in error) ||
+    typeof error.message !== 'string'
+  ) {
+    return null;
+  }
+  const details =
+    'details' in error &&
+    error.details !== null &&
+    typeof error.details === 'object' &&
+    !Array.isArray(error.details)
+      ? (error.details as Record<string, unknown>)
+      : undefined;
+  return { code: error.code, message: error.message, details };
+}
+
+function parseResponse<T>(
+  schema: { parse(value: unknown): T },
+  value: unknown,
+): T {
+  try {
+    return schema.parse(value);
+  } catch (error) {
+    throw responseValidationError(error);
+  }
 }
