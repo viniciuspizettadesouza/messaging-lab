@@ -21,7 +21,7 @@ import {
   type BrokerId,
 } from '@messaging-lab/shared';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { ZodError } from 'zod';
+import { z, ZodError } from 'zod';
 
 import { createBrokerAdapters } from './adapters/index.js';
 import { RunEventStore, formatSseEvent } from './benchmark/run-events.js';
@@ -36,6 +36,7 @@ import { openDatabase } from './database.js';
 import { ApiError } from './errors.js';
 import { RunRepository } from './run-repository.js';
 import { SuiteRepository } from './suite-repository.js';
+import { serializeSuiteCsv } from './suite-export.js';
 
 export interface Application {
   readonly app: FastifyInstance;
@@ -231,6 +232,28 @@ export function createApplication(
       throw new ApiError(404, 'SUITE_NOT_FOUND', `Suite ${id} was not found.`);
     }
     return suiteResponseSchema.parse(suite);
+  });
+
+  app.get('/api/suites/:id/export', async (request, reply) => {
+    const { id } = suiteIdParamsSchema.parse(request.params);
+    const { format } = z
+      .object({ format: z.enum(['json', 'csv']) })
+      .strict()
+      .parse(request.query);
+    const suite = suiteRepository.getById(id);
+    if (!suite) {
+      throw new ApiError(404, 'SUITE_NOT_FOUND', `Suite ${id} was not found.`);
+    }
+    const filename = `messaging-lab-suite-${id}.${format}`;
+    reply.header('content-disposition', `attachment; filename="${filename}"`);
+    if (format === 'csv') {
+      return reply
+        .type('text/csv; charset=utf-8')
+        .send(serializeSuiteCsv(suite));
+    }
+    return reply
+      .type('application/json; charset=utf-8')
+      .send(JSON.stringify(suiteResponseSchema.parse(suite), null, 2));
   });
 
   app.post('/api/suites/:id/cancel', async (request, reply) => {

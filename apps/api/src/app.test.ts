@@ -261,6 +261,29 @@ describe('API', () => {
     expect(suiteResponseSchema.parse(detailResponse.json()).runs).toHaveLength(
       2,
     );
+    expect(completed.combinationSummaries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          successfulTrials: 1,
+          unsuccessfulTrials: 0,
+          throughput: expect.objectContaining({ sampleSize: 1 }),
+        }),
+      ]),
+    );
+
+    const jsonExport = await application.app.inject({
+      method: 'GET',
+      url: `/api/suites/${created.id}/export?format=json`,
+    });
+    const csvExport = await application.app.inject({
+      method: 'GET',
+      url: `/api/suites/${created.id}/export?format=csv`,
+    });
+    expect(jsonExport.headers['content-disposition']).toContain('.json');
+    expect(suiteResponseSchema.parse(jsonExport.json()).runs).toHaveLength(2);
+    expect(csvExport.headers['content-type']).toContain('text/csv');
+    expect(csvExport.body).toContain('throughput_messages_per_second');
+    expect(csvExport.body.split('\n')).toHaveLength(4);
 
     const eventResponse = await application.app.inject({
       method: 'GET',

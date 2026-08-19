@@ -51,6 +51,30 @@ Latency timestamps use `process.hrtime.bigint()` in the same API host process be
 
 The engine uses reservoir sampling with a capacity of 10,000 observations. This bounds memory for large runs while giving each observation an equal probability of inclusion. Per-message observations are never stored in SQLite.
 
+## Repeated-trial summaries
+
+Suites group trials by the exact broker and scenario combination. A trial is
+successful only when it completes with persisted metrics. A completed trial
+without metrics is counted as statistically unsuccessful. Failed, timed-out,
+and cancelled trials are excluded from throughput and latency distributions,
+but they remain in the status counts, error totals, exports, and ordered trial
+list. Queued and running trials are reported separately and are not classified
+as unsuccessful.
+
+For each metric, the suite reports the sample size, minimum, median, maximum,
+first and third quartiles, and interquartile range. Median and quartiles use
+linear interpolation at positions `(n - 1) × p` in the sorted successful-trial
+sample. A summary with fewer than three successful trials is shown with a
+low-sample warning; its values remain available but should not be treated as a
+useful distribution.
+
+Each run performs its own untimed warm-up. Warm-up messages and timings never
+enter persisted run metrics or suite distributions. Loss, duplicates, and run
+errors are summed across successful trials, while errors attached to
+unsuccessful trials are also counted. The redelivery aggregate is currently
+zero because standard performance workloads do not intentionally interrupt
+consumers; recovery experiments will populate that measure.
+
 ## Native capability demonstrations
 
 - Redis Streams and Kafka expose replay demonstrations because they retain an ordered log.

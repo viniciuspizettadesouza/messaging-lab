@@ -92,6 +92,7 @@ describe('suite schemas', () => {
         },
         progress,
         summary,
+        combinationSummaries: [],
         createdAt: timestamp,
         startedAt: timestamp,
         finishedAt: null,

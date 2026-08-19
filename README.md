@@ -19,12 +19,14 @@ This project is an educational lab, not a universal broker ranking. Results desc
 - Inspect delivery counts, loss, duplicates, capability notes, and errors.
 - Keep aggregate run history in SQLite across application restarts.
 - Restore active suites after reload and inspect their ordered trials and failures.
+- Compare repeated trials with medians, quartiles, ranges, anomaly totals, and low-sample warnings.
+- Export every suite and its underlying trials as JSON or CSV.
 - See where persistence, acknowledgements, recovery, and replay are genuinely supported.
 
 Suites are coordinated and persisted by the API, not the browser. They continue
 if the dashboard reloads or disconnects, retain their complete execution order,
 and keep failed, timed-out, and cancelled trials visible. Distribution-aware
-aggregate statistics are planned separately.
+aggregate statistics use successful trials without hiding unsuccessful ones.
 
 ## Quick start
 

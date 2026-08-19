@@ -99,6 +99,98 @@ export const suiteSummarySchema = z
     }
   });
 
+export const distributionSummarySchema = z
+  .object({
+    sampleSize: z.number().int().nonnegative(),
+    minimum: z.number().finite().nonnegative(),
+    q1: z.number().finite().nonnegative(),
+    median: z.number().finite().nonnegative(),
+    q3: z.number().finite().nonnegative(),
+    maximum: z.number().finite().nonnegative(),
+    interquartileRange: z.number().finite().nonnegative(),
+  })
+  .strict()
+  .superRefine((summary, context) => {
+    if (
+      summary.sampleSize === 0 ||
+      summary.minimum > summary.q1 ||
+      summary.q1 > summary.median ||
+      summary.median > summary.q3 ||
+      summary.q3 > summary.maximum
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A distribution must contain an ordered, non-empty sample.',
+      });
+    }
+  });
+
+const suiteTrialCountsSchema = z
+  .object({
+    pending: z.number().int().nonnegative(),
+    running: z.number().int().nonnegative(),
+    completed: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
+    timedOut: z.number().int().nonnegative(),
+    cancelled: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export const suiteCombinationSummarySchema = z
+  .object({
+    combinationIndex: z.number().int().nonnegative(),
+    combination: suiteCombinationSchema,
+    totalTrials: z.number().int().positive(),
+    successfulTrials: z.number().int().nonnegative(),
+    unsuccessfulTrials: z.number().int().nonnegative(),
+    statusCounts: suiteTrialCountsSchema,
+    throughput: distributionSummarySchema.nullable(),
+    latency: z
+      .object({
+        p50Ms: distributionSummarySchema.nullable(),
+        p95Ms: distributionSummarySchema.nullable(),
+        p99Ms: distributionSummarySchema.nullable(),
+      })
+      .strict(),
+    totals: z
+      .object({
+        publishedMessages: z.number().int().nonnegative(),
+        receivedMessages: z.number().int().nonnegative(),
+        lostMessages: z.number().int().nonnegative(),
+        duplicateMessages: z.number().int().nonnegative(),
+        redeliveredMessages: z.number().int().nonnegative(),
+        errors: z.number().int().nonnegative(),
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((summary, context) => {
+    const statusTotal = Object.values(summary.statusCounts).reduce(
+      (total, count) => total + count,
+      0,
+    );
+    if (statusTotal !== summary.totalTrials) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Combination status counts must equal total trials.',
+        path: ['totalTrials'],
+      });
+    }
+    if (
+      summary.successfulTrials > summary.statusCounts.completed ||
+      summary.unsuccessfulTrials !==
+        summary.statusCounts.failed +
+          summary.statusCounts.timedOut +
+          summary.statusCounts.cancelled +
+          (summary.statusCounts.completed - summary.successfulTrials)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Successful and unsuccessful counts must match statuses.',
+      });
+    }
+  });
+
 export const suiteRunSchema = z
   .object({
     position: z.number().int().nonnegative(),
@@ -117,6 +209,7 @@ export const suiteSchema = z
     configuration: suiteConfigurationSchema,
     progress: suiteProgressSchema,
     summary: suiteSummarySchema,
+    combinationSummaries: z.array(suiteCombinationSummarySchema),
     createdAt: isoTimestampSchema,
     startedAt: isoTimestampSchema.nullable(),
     finishedAt: isoTimestampSchema.nullable(),
@@ -334,6 +427,10 @@ export type SuiteId = z.infer<typeof suiteIdSchema>;
 export type SuiteError = z.infer<typeof suiteErrorSchema>;
 export type SuiteProgress = z.infer<typeof suiteProgressSchema>;
 export type SuiteSummary = z.infer<typeof suiteSummarySchema>;
+export type DistributionSummary = z.infer<typeof distributionSummarySchema>;
+export type SuiteCombinationSummary = z.infer<
+  typeof suiteCombinationSummarySchema
+>;
 export type SuiteRun = z.infer<typeof suiteRunSchema>;
 export type Suite = z.infer<typeof suiteSchema>;
 export type SuiteEvent = z.infer<typeof suiteEventSchema>;

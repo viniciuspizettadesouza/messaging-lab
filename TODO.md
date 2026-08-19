@@ -64,15 +64,15 @@ This checklist continues from the completed MVP. Items are ordered by dependency
 
 ## 13. Repeated trials and statistical summaries
 
-- [ ] Calculate successful and unsuccessful trial counts for each broker/scenario combination.
-- [ ] Calculate median, minimum, maximum, and interquartile range for throughput and latency.
-- [ ] Aggregate loss, duplicates, redeliveries, and errors without hiding individual results.
-- [ ] Define and document the treatment of warm-up and failed trials.
-- [ ] Show aggregate summaries with access to every underlying trial.
-- [ ] Replace single-value rankings with distribution-aware visualizations where repetitions exist.
-- [ ] Show a clear warning when too few successful trials exist for a useful summary.
-- [ ] Add unit tests for statistics, empty samples, partial failures, and outliers.
-- [ ] Add JSON and CSV export for a suite and its underlying runs.
+- [x] Calculate successful and unsuccessful trial counts for each broker/scenario combination.
+- [x] Calculate median, minimum, maximum, and interquartile range for throughput and latency.
+- [x] Aggregate loss, duplicates, redeliveries, and errors without hiding individual results.
+- [x] Define and document the treatment of warm-up and failed trials.
+- [x] Show aggregate summaries with access to every underlying trial.
+- [x] Replace single-value rankings with distribution-aware visualizations where repetitions exist.
+- [x] Show a clear warning when too few successful trials exist for a useful summary.
+- [x] Add unit tests for statistics, empty samples, partial failures, and outliers.
+- [x] Add JSON and CSV export for a suite and its underlying runs.
 
 ## 14. Environment provenance and reproducibility
 

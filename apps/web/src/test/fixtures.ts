@@ -100,6 +100,55 @@ export function createSuite(
   const activePosition = trialStatuses.findIndex((value) =>
     ['pending', 'running'].includes(value),
   );
+  const combinationSummaries = runs.map((trial, combinationIndex) => {
+    const metrics = trial.run?.metrics;
+    const distribution = (value: number | undefined) =>
+      value === undefined
+        ? null
+        : {
+            sampleSize: 1,
+            minimum: value,
+            q1: value,
+            median: value,
+            q3: value,
+            maximum: value,
+            interquartileRange: 0,
+          };
+    const runStatus = trial.run?.status ?? 'pending';
+    return {
+      combinationIndex,
+      combination: trial.combination,
+      totalTrials: 1,
+      successfulTrials: runStatus === 'completed' ? 1 : 0,
+      unsuccessfulTrials: ['failed', 'timed-out', 'cancelled'].includes(
+        runStatus,
+      )
+        ? 1
+        : 0,
+      statusCounts: {
+        pending: runStatus === 'pending' ? 1 : 0,
+        running: runStatus === 'running' ? 1 : 0,
+        completed: runStatus === 'completed' ? 1 : 0,
+        failed: runStatus === 'failed' ? 1 : 0,
+        timedOut: runStatus === 'timed-out' ? 1 : 0,
+        cancelled: runStatus === 'cancelled' ? 1 : 0,
+      },
+      throughput: distribution(metrics?.throughputMessagesPerSecond),
+      latency: {
+        p50Ms: distribution(metrics?.latency.p50Ms),
+        p95Ms: distribution(metrics?.latency.p95Ms),
+        p99Ms: distribution(metrics?.latency.p99Ms),
+      },
+      totals: {
+        publishedMessages: metrics?.publishedMessages ?? 0,
+        receivedMessages: metrics?.receivedMessages ?? 0,
+        lostMessages: metrics?.lostMessages ?? 0,
+        duplicateMessages: metrics?.duplicateMessages ?? 0,
+        redeliveredMessages: 0,
+        errors: (metrics?.errorCount ?? 0) + (trial.run?.errors.length ?? 0),
+      },
+    };
+  });
 
   return {
     id: suiteId,
@@ -130,6 +179,7 @@ export function createSuite(
       timedOutRuns: counts('timed-out'),
       cancelledRuns: counts('cancelled'),
     },
+    combinationSummaries,
     createdAt: timestamp,
     startedAt: status === 'pending' ? null : timestamp,
     finishedAt: ['pending', 'running'].includes(status) ? null : timestamp,

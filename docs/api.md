@@ -121,7 +121,17 @@ Suite statuses are `pending`, `running`, `completed`, `failed`, `cancelled`, and
 ### `GET /api/suites/:id`
 
 Returns one suite and every ordered trial. Entries for queued trials have a
-null `run`; started trials embed their persisted run.
+null `run`; started trials embed their persisted run. `combinationSummaries`
+contains success/failure counts, five-number throughput and p50/p95/p99 latency
+distributions, IQR, and aggregate delivery anomalies for each configured
+broker/scenario combination.
+
+### `GET /api/suites/:id/export?format=json|csv`
+
+Downloads the suite and all underlying trials. JSON uses the same validated
+suite contract as the detail endpoint. CSV emits one row per ordered trial,
+including queued and unsuccessful trials, configuration identity, lifecycle
+timestamps, metrics, anomaly counts, and errors.
 
 ### `POST /api/suites/:id/cancel`
 

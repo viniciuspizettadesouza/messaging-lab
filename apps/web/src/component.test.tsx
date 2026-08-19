@@ -153,6 +153,11 @@ describe('dashboard components', () => {
       />,
     );
     expect(screen.getAllByText('Cancelled').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Too few successful trials/)).toHaveLength(2);
+    expect(screen.getByRole('link', { name: 'Export JSON' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('format=json'),
+    );
   });
 
   it('groups suite runs and supports arrow-key history navigation', async () => {

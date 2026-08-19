@@ -5,6 +5,7 @@ import {
   suiteConfigurationSchema,
   suiteErrorSchema,
   suiteNameSchema,
+  suiteRunSchema,
   suiteSchema,
   suiteStatusSchema,
   type RunStatus,
@@ -16,6 +17,7 @@ import {
 } from '@messaging-lab/shared';
 
 import { RunRepository } from './run-repository.js';
+import { summarizeSuiteCombinations } from './benchmark/suite-statistics.js';
 
 export interface SuiteExecutionItem {
   readonly position: number;
@@ -279,13 +281,15 @@ export class SuiteRepository {
          FROM suite_errors WHERE suite_id = ? ORDER BY id`,
       )
       .all(row.id) as unknown as SuiteErrorRow[];
-    const suiteRuns = itemRows.map((item) => ({
-      position: item.position,
-      combinationIndex: item.combination_index,
-      repetition: item.repetition,
-      combination: { broker: item.broker, scenario: item.scenario },
-      run: item.run_id ? this.runs.requireById(item.run_id) : null,
-    }));
+    const suiteRuns = itemRows.map((item) =>
+      suiteRunSchema.parse({
+        position: item.position,
+        combinationIndex: item.combination_index,
+        repetition: item.repetition,
+        combination: { broker: item.broker, scenario: item.scenario },
+        run: item.run_id ? this.runs.requireById(item.run_id) : null,
+      }),
+    );
     const counts: Record<RunStatus, number> = {
       pending: 0,
       running: 0,
@@ -324,6 +328,10 @@ export class SuiteRepository {
         timedOutRuns: counts['timed-out'],
         cancelledRuns: counts.cancelled,
       },
+      combinationSummaries: summarizeSuiteCombinations(
+        configuration.combinations,
+        suiteRuns,
+      ),
       createdAt: row.created_at,
       startedAt: row.started_at,
       finishedAt: row.finished_at,
