@@ -2,6 +2,8 @@
 
 This checklist continues from the completed MVP. Items are ordered by dependency; each section should leave the repository in a usable and documented state.
 
+The completed baseline records what was built under the original three-system comparison model. Section 16 introduces the researched comparison taxonomy that future work must follow and includes the retrofit needed for already completed result surfaces.
+
 ## Completed MVP baseline
 
 - [x] Create the TypeScript npm workspace with React, Fastify, and shared contracts.
@@ -97,7 +99,23 @@ This checklist continues from the completed MVP. Items are ordered by dependency
 - [x] Define cascade and broker-resource behavior for local history deletion.
 - [x] Add repository, API, and UI tests for filtering, pagination, selection, and deletion.
 
-## 16. Parameter sweep experiments
+## 16. Semantic comparison realignment
+
+- [ ] Add an ADR defining the primary Kafka-versus-RabbitMQ architectural trade-off comparison, the adjacent Redis Streams track, the Redis Pub/Sub baseline, and broker-native demonstrations.
+- [ ] Document the official-source evidence for retained logs, queue consumption, routing, acknowledgements, replay, consumer groups, and ephemeral delivery.
+- [ ] Add an explicit comparison-track identifier to shared suite, summary, selection, and export contracts without invalidating existing persisted runs.
+- [ ] Classify existing runs deterministically from broker and scenario when reading legacy data.
+- [ ] Make Kafka and RabbitMQ the only participants in default primary-comparison charts and summaries.
+- [ ] Move Redis Streams results into a separate adjacent-streaming panel with independent summaries and explanatory copy.
+- [ ] Keep Redis Pub/Sub in a separate ephemeral-baseline panel and prohibit durable-system rankings against it.
+- [ ] Allow mixed-track suites as scheduling containers while keeping their aggregates, charts, and conclusions separated by track.
+- [ ] Relabel cross-track manual selections as semantic contrasts and remove shared winners, rankings, and combined aggregates.
+- [ ] Explain partition-bound Kafka parallelism, RabbitMQ queue/exchange topology, Redis Streams pending-entry state, and the limits of identical workload inputs.
+- [ ] Update README, methodology, architecture, API examples, glossary, and dashboard copy to use the same taxonomy.
+- [ ] Add selector, contract, migration-compatibility, API, and UI tests for every track boundary.
+- [ ] Evaluate a future RabbitMQ Streams adapter as the prerequisite for a mechanism-level retained-stream comparison with Kafka.
+
+## 17. Parameter sweep experiments
 
 - [ ] Define a one-dimensional sweep contract and maximum generated-work limit.
 - [ ] Generate safe consumer-count sweeps.
@@ -106,11 +124,11 @@ This checklist continues from the completed MVP. Items are ordered by dependency
 - [ ] Generate safe message-count sweeps.
 - [ ] Reuse suite scheduling, repetition, ordering, cooldown, and cancellation.
 - [ ] Add curve charts with configuration values on the x-axis.
-- [ ] Keep Redis Pub/Sub sweeps visually separate from durable workloads.
+- [ ] Keep Kafka-versus-RabbitMQ, Redis Streams, and Redis Pub/Sub sweep curves in their respective comparison tracks.
 - [ ] Explain saturation, diminishing returns, and local-machine limitations.
 - [ ] Add tests for sweep expansion, validation limits, progress, and visualization selectors.
 
-## 17. Recovery and replay experiments
+## 18. Recovery and replay experiments
 
 - [ ] Define broker-native experiment types instead of forcing them into the common performance comparison.
 - [ ] Add application-controlled consumer interruption at a deterministic progress point.
@@ -124,18 +142,18 @@ This checklist continues from the completed MVP. Items are ordered by dependency
 - [ ] Add Docker-backed integration tests for every recovery path.
 - [ ] Add an educational UI that explains the expected and observed behavior.
 
-## 18. Ordering and backpressure experiments
+## 19. Ordering and backpressure experiments
 
 - [ ] Add producer and per-key sequence metadata to the benchmark message envelope.
 - [ ] Measure global and broker-native-scope ordering violations separately.
-- [ ] Document Kafka partition ordering and the corresponding scopes in Redis and RabbitMQ.
+- [ ] Document Kafka partition ordering, RabbitMQ queue delivery ordering, and Redis Stream ID ordering as separate native scopes rather than corresponding guarantees.
 - [ ] Add configurable artificial consumer delay.
 - [ ] Track backlog or lag only where its broker-specific meaning is clear.
 - [ ] Plot throughput, latency, and backlog behavior as consumer delay increases.
 - [ ] Record whether loss or duplicates occur during slow consumption and recovery.
 - [ ] Add unit and Docker-backed integration tests for ordering and slow-consumer behavior.
 
-## 19. End-to-end reliability and accessibility
+## 20. End-to-end reliability and accessibility
 
 - [ ] Add Playwright and a minimal browser-test configuration.
 - [ ] Test suite creation through aggregate result display against the Docker stack.
@@ -143,11 +161,12 @@ This checklist continues from the completed MVP. Items are ordered by dependency
 - [ ] Test SSE disconnect and reconnection without duplicated terminal handling.
 - [ ] Test suite and standalone-run cancellation from the browser.
 - [ ] Test filtering, manual comparison, and export.
+- [ ] Test that mixed-track suites and selections cannot produce combined rankings or aggregates.
 - [ ] Add automated accessibility checks for the main dashboard states.
 - [ ] Verify keyboard operation and readable progress announcements manually.
 - [ ] Keep CI performance assertions limited to correctness and broad sanity bounds.
 
-## 20. Documentation and publication quality
+## 21. Documentation and publication quality
 
 - [ ] Add `CONTRIBUTING.md` with setup, architecture boundaries, tests, and conventions.
 - [ ] Add `docs/experiment-recipes.md` with reproducible workloads and expected observations.
@@ -155,7 +174,7 @@ This checklist continues from the completed MVP. Items are ordered by dependency
 - [ ] Add `docs/troubleshooting.md` for Docker, ports, broker startup, SSE, and orphaned resources.
 - [ ] Add `docs/glossary.md` for messaging and benchmark terminology.
 - [ ] Add an ADR for serial execution and server-managed suites.
-- [ ] Add an ADR for semantic comparison groups.
+- [ ] Cross-check the semantic comparison ADR from section 16 against all public documentation and screenshots.
 - [ ] Document database migrations, suite endpoints, events, and environment snapshots.
 - [ ] Update architecture and messaging-flow diagrams for suites and recovery experiments.
 - [ ] Refresh dashboard screenshots after the suite UI stabilizes.
@@ -169,5 +188,6 @@ This checklist continues from the completed MVP. Items are ordered by dependency
 - [ ] Multi-host load generation.
 - [ ] Import and compare exported suite files.
 - [ ] Additional brokers or hosted broker services.
+- [ ] RabbitMQ Streams and super streams for a retained-log comparison with Kafka.
 
 These items require additional safety, reproducibility, or product decisions and should not delay the core Phase 2 milestones.
