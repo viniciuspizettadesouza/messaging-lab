@@ -1,4 +1,9 @@
-import type { BrokerId, RunStatus, ScenarioId } from '@messaging-lab/shared';
+import type {
+  BrokerId,
+  RunStatus,
+  ScenarioId,
+  SuiteStatus,
+} from '@messaging-lab/shared';
 
 export const BROKER_LABELS: Record<BrokerId, string> = {
   redis: 'Redis',
@@ -11,13 +16,14 @@ export const SCENARIO_LABELS: Record<ScenarioId, string> = {
   'competing-consumers': 'Competing consumers',
 };
 
-export const STATUS_LABELS: Record<RunStatus, string> = {
+export const STATUS_LABELS: Record<RunStatus | SuiteStatus, string> = {
   pending: 'Pending',
   running: 'Running',
   completed: 'Completed',
   failed: 'Failed',
   'timed-out': 'Timed out',
   cancelled: 'Cancelled',
+  stopped: 'Stopped',
 };
 
 export function formatNumber(value: number, maximumFractionDigits = 1): string {

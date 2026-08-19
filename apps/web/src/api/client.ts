@@ -1,14 +1,22 @@
 import {
   brokersResponseSchema,
   cancelRunResponseSchema,
+  cancelSuiteResponseSchema,
+  createSuiteRequestSchema,
   runEventSchema,
   runResponseSchema,
   runsResponseSchema,
   startRunRequestSchema,
+  suiteEventSchema,
+  suiteResponseSchema,
+  suitesResponseSchema,
   type BrokerInfo,
   type Run,
   type RunEvent,
   type StartRunRequest,
+  type CreateSuiteRequest,
+  type Suite,
+  type SuiteEvent,
 } from '@messaging-lab/shared';
 
 import {
@@ -22,6 +30,11 @@ export interface RunEventHandlers {
   readonly onDisconnect: () => void;
 }
 
+export interface SuiteEventHandlers {
+  readonly onEvent: (event: SuiteEvent) => void;
+  readonly onDisconnect: () => void;
+}
+
 export interface DashboardApi {
   getBrokers(): Promise<BrokerInfo[]>;
   getRuns(): Promise<Run[]>;
@@ -29,6 +42,11 @@ export interface DashboardApi {
   startRun(request: StartRunRequest): Promise<Run>;
   cancelRun(runId: string): Promise<void>;
   subscribe(runId: string, handlers: RunEventHandlers): () => void;
+  getSuites(): Promise<Suite[]>;
+  getSuite(suiteId: string): Promise<Suite>;
+  startSuite(request: CreateSuiteRequest): Promise<Suite>;
+  cancelSuite(suiteId: string): Promise<void>;
+  subscribeSuite(suiteId: string, handlers: SuiteEventHandlers): () => void;
 }
 
 export class ApiClient implements DashboardApi {
@@ -82,6 +100,70 @@ export class ApiClient implements DashboardApi {
         try {
           const result = runEventSchema.parse(JSON.parse(String(message.data)));
           handlers.onEvent(result);
+        } catch {
+          handlers.onDisconnect();
+        }
+      });
+    }
+    source.onerror = () => handlers.onDisconnect();
+    return () => source.close();
+  }
+
+  public async getSuites(): Promise<Suite[]> {
+    const response = await requestJson(`${this.baseUrl}/api/suites?limit=100`);
+    return parseResponse(suitesResponseSchema, response).suites;
+  }
+
+  public async getSuite(suiteId: string): Promise<Suite> {
+    return parseResponse(
+      suiteResponseSchema,
+      await requestJson(`${this.baseUrl}/api/suites/${suiteId}`),
+    );
+  }
+
+  public async startSuite(request: CreateSuiteRequest): Promise<Suite> {
+    createSuiteRequestSchema.parse(request);
+    return parseResponse(
+      suiteResponseSchema,
+      await requestJson(`${this.baseUrl}/api/suites`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(request),
+      }),
+    );
+  }
+
+  public async cancelSuite(suiteId: string): Promise<void> {
+    parseResponse(
+      cancelSuiteResponseSchema,
+      await requestJson(`${this.baseUrl}/api/suites/${suiteId}/cancel`, {
+        method: 'POST',
+      }),
+    );
+  }
+
+  public subscribeSuite(
+    suiteId: string,
+    handlers: SuiteEventHandlers,
+  ): () => void {
+    const source = new EventSource(
+      `${this.baseUrl}/api/suites/${suiteId}/events`,
+    );
+    const eventTypes = [
+      'status',
+      'progress',
+      'run-event',
+      'summary',
+      'error',
+    ] as const;
+
+    for (const type of eventTypes) {
+      source.addEventListener(type, (message) => {
+        if (!(message instanceof MessageEvent)) return;
+        try {
+          handlers.onEvent(
+            suiteEventSchema.parse(JSON.parse(String(message.data))),
+          );
         } catch {
           handlers.onDisconnect();
         }

@@ -11,22 +11,20 @@ This project is an educational lab, not a universal broker ranking. Results desc
 - Compare durable fan-out and competing-consumer workloads in separate result groups; Redis Pub/Sub is shown only as an ephemeral live-delivery baseline.
 
 - Run live fan-out and competing-consumer experiments against three real brokers.
-- Queue all six broker/pattern combinations sequentially with one button.
+- Build persistent suites from selected broker/pattern combinations.
+- Configure suite repetitions, fixed/rotating/randomized order, and cooldown.
 - Configure message count, payload size, producer concurrency, consumers, and timeout.
 - Watch publishing and consumption progress through Server-Sent Events (SSE).
 - Compare throughput and p50/p95/p99 end-to-end latency.
 - Inspect delivery counts, loss, duplicates, capability notes, and errors.
 - Keep aggregate run history in SQLite across application restarts.
-- Create persistent suites through the API with repetitions, stored ordering,
-  cooldown, cancellation, and SSE progress.
+- Restore active suites after reload and inspect their ordered trials and failures.
 - See where persistence, acknowledgements, recovery, and replay are genuinely supported.
 
-The current “Run all 6 sequentially” action is coordinated by the browser. It
-starts one ordinary run after another, and each result is persisted separately.
-Reloading or closing the dashboard stops the remaining browser queue, although
-the active API run continues. The persistent suite API is now available, but
-the dashboard has not switched to it yet. Distribution-aware aggregate
-statistics are planned separately.
+Suites are coordinated and persisted by the API, not the browser. They continue
+if the dashboard reloads or disconnects, retain their complete execution order,
+and keep failed, timed-out, and cancelled trials visible. Distribution-aware
+aggregate statistics are planned separately.
 
 ## Quick start
 
@@ -77,9 +75,9 @@ lane while it serially schedules its trials. Every run receives isolated broker
 resource names; completion, cancellation, timeout, and failure all enter the
 cleanup path.
 
-The dashboard's six-run queue is still frontend state; server-managed suites
-are currently available through the HTTP API. See the architecture document
-for both execution flows.
+The dashboard creates and observes server-managed suites through validated JSON
+and SSE contracts. Run and suite selections have stable URLs, and suite history
+groups every trial while leaving standalone runs visible.
 
 More detail and messaging-flow diagrams are in [architecture](docs/architecture.md).
 

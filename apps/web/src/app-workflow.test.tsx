@@ -2,20 +2,26 @@
 
 import './test/setup.js';
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  startRunRequestSchema,
-  type Run,
-  type RunEvent,
-  type StartRunRequest,
-} from '@messaging-lab/shared';
+import type { Run, RunEvent, SuiteEvent } from '@messaging-lab/shared';
 
-import type { DashboardApi, RunEventHandlers } from './api/client.js';
+import type {
+  DashboardApi,
+  RunEventHandlers,
+  SuiteEventHandlers,
+} from './api/client.js';
 import { App } from './app.js';
-import { brokers, createRun, runId, timestamp } from './test/fixtures.js';
+import {
+  brokers,
+  createRun,
+  createSuite,
+  runId,
+  suiteId,
+  timestamp,
+} from './test/fixtures.js';
 
 describe('dashboard workflows', () => {
   it('shows loading and then the empty experiment states', async () => {
@@ -34,7 +40,7 @@ describe('dashboard workflows', () => {
     expect(screen.getByText('No experiment selected')).toBeInTheDocument();
   });
 
-  it('starts an experiment and applies live progress and completion events', async () => {
+  it('starts a standalone run and applies live completion events', async () => {
     const pending = createRun('pending');
     const completed = createRun('completed');
     const api = createApi({
@@ -49,14 +55,14 @@ describe('dashboard workflows', () => {
     const user = userEvent.setup();
 
     await user.click(
-      await screen.findByRole('button', { name: 'Start experiment' }),
+      await screen.findByRole('button', { name: 'Start standalone run' }),
     );
     expect(api.startRun).toHaveBeenCalledWith(
       expect.objectContaining({ broker: 'redis', scenario: 'fan-out' }),
     );
-    expect(screen.getAllByText('Pending').length).toBeGreaterThan(0);
+    expect(window.location.search).toBe(`?run=${runId}`);
 
-    api.emit({
+    api.emitRun({
       type: 'progress',
       runId,
       sequence: 2,
@@ -68,7 +74,7 @@ describe('dashboard workflows', () => {
       receivedMessages: 4,
     });
     expect(await screen.findByText('50%')).toBeInTheDocument();
-    api.emit({
+    api.emitRun({
       type: 'status',
       runId,
       sequence: 3,
@@ -77,130 +83,168 @@ describe('dashboard workflows', () => {
     });
 
     expect((await screen.findAllByText('500 msg/s')).length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Completed').length).toBeGreaterThan(0);
   });
 
-  it('offers cancellation and reports a disconnected live stream', async () => {
-    const running = createRun('running');
-    const api = createApi({ getRuns: vi.fn(async () => [running]) });
-    render(<App api={api} />);
-
-    expect((await screen.findAllByText('Running')).length).toBeGreaterThan(0);
-    api.disconnect();
-    expect(await screen.findByText('Live connection lost')).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Cancel run' }));
-    expect(api.cancelRun).toHaveBeenCalledWith(runId);
-  });
-
-  it('runs every broker and scenario sequentially as one suite', async () => {
-    const startedRuns: Run[] = [];
+  it('creates one server-managed suite and renders live aggregate progress', async () => {
+    const pending = createSuite('pending');
+    const completed = createSuite('completed', ['completed', 'failed']);
     const api = createApi({
-      startRun: vi.fn(async (request: StartRunRequest) => {
-        const configuration = startRunRequestSchema.parse(request);
-        const run = {
-          ...createRun('pending'),
-          id: suiteRunId(startedRuns.length + 1),
-          configuration,
-        };
-        startedRuns.push(run);
-        return run;
-      }),
-      getRun: vi.fn(async (id: string) => ({
-        ...(startedRuns.find((run) => run.id === id) ?? createRun()),
-        status: 'completed' as const,
-      })),
-      getRuns: vi.fn(async () => []),
+      startSuite: vi.fn(async () => pending),
+      getSuite: vi.fn(async () => completed),
+      getSuites: vi
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([completed]),
+      getRuns: vi
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce(
+          completed.runs.flatMap(({ run }) => (run ? [run] : [])),
+        ),
     });
     render(<App api={api} />);
 
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Run all 6 sequentially' }),
+      await screen.findByRole('button', { name: 'Start benchmark suite' }),
     );
+    expect(api.startSuite).toHaveBeenCalledTimes(1);
+    expect(api.startSuite).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repetitions: 3,
+        orderStrategy: 'fixed',
+        cooldownMs: 1_000,
+        combinations: expect.arrayContaining([
+          { broker: 'redis', scenario: 'fan-out' },
+          { broker: 'rabbitmq', scenario: 'competing-consumers' },
+        ]),
+      }),
+    );
+    expect(window.location.search).toBe(`?suite=${suiteId}`);
 
-    const expectedOrder = [
-      ['redis', 'fan-out'],
-      ['redis', 'competing-consumers'],
-      ['kafka', 'fan-out'],
-      ['kafka', 'competing-consumers'],
-      ['rabbitmq', 'fan-out'],
-      ['rabbitmq', 'competing-consumers'],
-    ];
+    api.emitSuite({
+      type: 'progress',
+      suiteId,
+      sequence: 3,
+      timestamp,
+      progress: {
+        completedRuns: 1,
+        totalRuns: 2,
+        currentPosition: 1,
+        currentCombination: {
+          broker: 'kafka',
+          scenario: 'competing-consumers',
+        },
+        currentRepetition: 1,
+        activeRunId: runId,
+      },
+    });
+    expect(await screen.findByText('1/2 finished')).toBeInTheDocument();
+    expect(screen.getByText('1 remaining')).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/Kafka · Competing consumers/).length,
+    ).toBeGreaterThan(0);
 
-    for (const [index, expected] of expectedOrder.entries()) {
-      await waitFor(() =>
-        expect(api.startRun).toHaveBeenCalledTimes(index + 1),
-      );
-      expect(api.startRun).toHaveBeenNthCalledWith(
-        index + 1,
-        expect.objectContaining({ broker: expected[0], scenario: expected[1] }),
-      );
-      api.emit({
-        type: 'status',
-        runId: startedRuns[index]!.id,
-        sequence: index,
-        timestamp,
-        status: 'completed',
-      });
-    }
-
-    expect(await screen.findByText('Suite complete')).toBeInTheDocument();
-    expect(screen.getByText('6/6 finished')).toBeInTheDocument();
+    api.emitSuite({
+      type: 'status',
+      suiteId,
+      sequence: 4,
+      timestamp,
+      status: 'completed',
+    });
+    const summary = await screen.findByLabelText('Suite trial summary');
+    expect(within(summary).getByText('Failed')).toBeInTheDocument();
+    expect(within(summary).getAllByText('1')).toHaveLength(2);
+    expect(screen.getByText('Broker unavailable.')).toBeInTheDocument();
   });
 
-  it('stops the remaining suite queue when the active run is cancelled', async () => {
-    const api = createApi();
+  it('restores an active suite after reload and cancels it through the suite API', async () => {
+    const running = createSuite('running', ['running']);
+    const api = createApi({ getSuites: vi.fn(async () => [running]) });
     render(<App api={api} />);
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Run all 6 sequentially' }),
-    );
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Cancel run' }),
-    );
-    api.emit({
-      type: 'status',
-      runId,
-      sequence: 1,
-      timestamp,
-      status: 'cancelled',
-    });
+    expect(
+      await screen.findByRole('heading', { name: running.name }),
+    ).toBeInTheDocument();
+    expect(api.subscribeSuite).toHaveBeenCalledWith(suiteId, expect.anything());
+    expect(window.location.search).toBe(`?suite=${suiteId}`);
+    api.disconnectSuite();
+    expect(
+      await screen.findByText('Live suite connection lost'),
+    ).toBeInTheDocument();
 
-    expect(await screen.findByText('Suite stopped')).toBeInTheDocument();
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    expect(api.startRun).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel suite' }));
+    expect(api.cancelSuite).toHaveBeenCalledWith(suiteId);
+  });
+
+  it('restores stable suite URLs and links suite trials to stable run URLs', async () => {
+    const completed = createSuite('completed', ['completed', 'failed']);
+    window.history.replaceState(null, '', `/?suite=${completed.id}`);
+    const api = createApi({
+      getSuites: vi.fn(async () => [completed]),
+      getRuns: vi.fn(async () =>
+        completed.runs.flatMap(({ run }) => (run ? [run] : [])),
+      ),
+    });
+    render(<App api={api} />);
+
+    expect(
+      await screen.findByRole('heading', { name: completed.name }),
+    ).toBeInTheDocument();
+    const executionOrder = screen.getByText('Execution order').parentElement!;
+    await userEvent.click(within(executionOrder).getAllByRole('button')[0]!);
+    expect(window.location.search).toMatch(/^\?run=/);
+    expect(
+      screen.getByRole('heading', { name: /Redis · Live fan-out/ }),
+    ).toBeInTheDocument();
   });
 });
 
 interface FakeApi extends DashboardApi {
-  emit(event: RunEvent): void;
-  disconnect(): void;
+  emitRun(event: RunEvent): void;
+  emitSuite(event: SuiteEvent): void;
+  disconnectRun(): void;
+  disconnectSuite(): void;
 }
 
 function createApi(overrides: Partial<DashboardApi> = {}): FakeApi {
-  let handlers: RunEventHandlers | null = null;
+  let runHandlers: RunEventHandlers | null = null;
+  let suiteHandlers: SuiteEventHandlers | null = null;
   return {
     getBrokers: vi.fn(async () => brokers),
     getRuns: vi.fn(async () => []),
     getRun: vi.fn(async () => createRun('completed')),
     startRun: vi.fn(async () => createRun('pending')),
     cancelRun: vi.fn(async () => undefined),
-    subscribe: vi.fn((_id, nextHandlers) => {
-      handlers = nextHandlers;
+    subscribe: vi.fn((_id, handlers) => {
+      runHandlers = handlers;
       return () => {
-        handlers = null;
+        runHandlers = null;
+      };
+    }),
+    getSuites: vi.fn(async () => []),
+    getSuite: vi.fn(async () =>
+      createSuite('completed', ['completed', 'completed']),
+    ),
+    startSuite: vi.fn(async () => createSuite('pending')),
+    cancelSuite: vi.fn(async () => undefined),
+    subscribeSuite: vi.fn((_id, handlers) => {
+      suiteHandlers = handlers;
+      return () => {
+        suiteHandlers = null;
       };
     }),
     ...overrides,
-    emit(event) {
-      handlers?.onEvent(event);
+    emitRun(event) {
+      runHandlers?.onEvent(event);
     },
-    disconnect() {
-      handlers?.onDisconnect();
+    emitSuite(event) {
+      suiteHandlers?.onEvent(event);
+    },
+    disconnectRun() {
+      runHandlers?.onDisconnect();
+    },
+    disconnectSuite() {
+      suiteHandlers?.onDisconnect();
     },
   };
-}
-
-function suiteRunId(index: number): string {
-  return `11111111-1111-4111-8111-${String(index).padStart(12, '0')}`;
 }

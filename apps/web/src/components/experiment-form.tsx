@@ -6,33 +6,34 @@ import {
   BROKER_CAPABILITIES,
   BROKER_IDS,
   SCENARIO_IDS,
+  SUITE_DEFAULTS,
+  SUITE_LIMITS,
+  createSuiteRequestSchema,
   startRunRequestSchema,
   type BrokerId,
+  type CreateSuiteRequest,
   type ScenarioId,
   type StartRunRequest,
+  type SuiteCombination,
+  type SuiteOrderStrategy,
 } from '@messaging-lab/shared';
 
 import { BROKER_LABELS, SCENARIO_LABELS } from '../format.js';
 
-export interface BatchProgress {
-  readonly completed: number;
-  readonly current: number;
-  readonly total: number;
-  readonly status: 'running' | 'completed' | 'stopped';
-}
-
 interface ExperimentFormProps {
   readonly disabled: boolean;
-  readonly batchProgress: BatchProgress | null;
   readonly onStart: (request: StartRunRequest) => Promise<void>;
-  readonly onRunAll: (request: StartRunRequest) => Promise<void>;
+  readonly onStartSuite: (request: CreateSuiteRequest) => Promise<void>;
 }
+
+const ALL_COMBINATIONS: SuiteCombination[] = BROKER_IDS.flatMap((broker) =>
+  SCENARIO_IDS.map((scenario) => ({ broker, scenario })),
+);
 
 export function ExperimentForm({
   disabled,
-  batchProgress,
   onStart,
-  onRunAll,
+  onStartSuite,
 }: ExperimentFormProps) {
   const [broker, setBroker] = useState<BrokerId>('redis');
   const [scenario, setScenario] = useState<ScenarioId>('fan-out');
@@ -51,6 +52,19 @@ export function ExperimentForm({
   const [timeoutMs, setTimeoutMs] = useState<number>(
     BENCHMARK_DEFAULTS.timeoutMs,
   );
+  const [suiteName, setSuiteName] = useState('Benchmark suite');
+  const [repetitions, setRepetitions] = useState<number>(
+    SUITE_DEFAULTS.repetitions,
+  );
+  const [orderStrategy, setOrderStrategy] = useState<SuiteOrderStrategy>(
+    SUITE_DEFAULTS.orderStrategy,
+  );
+  const [cooldownMs, setCooldownMs] = useState<number>(
+    SUITE_DEFAULTS.cooldownMs,
+  );
+  const [selectedCombinations, setSelectedCombinations] = useState(
+    () => new Set(ALL_COMBINATIONS.map(combinationKey)),
+  );
   const [validationError, setValidationError] = useState<string | null>(null);
   const capability = useMemo(
     () => BROKER_CAPABILITIES[broker][scenario],
@@ -59,24 +73,38 @@ export function ExperimentForm({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const request = validatedRequest();
+    const request = validatedRunRequest();
     if (request) await onStart(request);
   }
 
-  async function runAll(): Promise<void> {
-    const request = validatedRequest();
-    if (request) await onRunAll(request);
+  async function startSuite(): Promise<void> {
+    const combinations = ALL_COMBINATIONS.filter((combination) =>
+      selectedCombinations.has(combinationKey(combination)),
+    );
+    const request: CreateSuiteRequest = {
+      name: suiteName,
+      workload: workload(),
+      combinations,
+      repetitions,
+      orderStrategy,
+      cooldownMs,
+    };
+    const parsed = createSuiteRequestSchema.safeParse(request);
+    if (!parsed.success) {
+      setValidationError(
+        parsed.error.issues[0]?.message ?? 'Check the suite values.',
+      );
+      return;
+    }
+    setValidationError(null);
+    await onStartSuite(request);
   }
 
-  function validatedRequest(): StartRunRequest | null {
+  function validatedRunRequest(): StartRunRequest | null {
     const parsed = startRunRequestSchema.safeParse({
       broker,
       scenario,
-      messageCount,
-      payloadSizeBytes,
-      producerConcurrency,
-      consumerCount,
-      timeoutMs,
+      ...workload(),
     });
     if (!parsed.success) {
       setValidationError(
@@ -88,19 +116,39 @@ export function ExperimentForm({
     return parsed.data;
   }
 
+  function workload() {
+    return {
+      messageCount,
+      payloadSizeBytes,
+      producerConcurrency,
+      consumerCount,
+      timeoutMs,
+    };
+  }
+
+  function toggleCombination(combination: SuiteCombination): void {
+    const key = combinationKey(combination);
+    setSelectedCombinations((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
   return (
     <section className="experiment-panel" aria-labelledby="experiment-heading">
       <div className="section-heading compact">
         <div>
           <p className="eyebrow">New experiment</p>
-          <h2 id="experiment-heading">Configure a run</h2>
+          <h2 id="experiment-heading">Configure workloads</h2>
         </div>
       </div>
       <form onSubmit={(event) => void submit(event)}>
         <fieldset disabled={disabled}>
           <div className="form-grid two-columns">
             <label>
-              Broker
+              Standalone broker
               <select
                 value={broker}
                 onChange={(event) => setBroker(event.target.value as BrokerId)}
@@ -113,7 +161,7 @@ export function ExperimentForm({
               </select>
             </label>
             <label>
-              Scenario
+              Standalone scenario
               <select
                 value={scenario}
                 onChange={(event) =>
@@ -188,61 +236,100 @@ export function ExperimentForm({
               onChange={setTimeoutMs}
             />
           </div>
+
+          <div
+            className="suite-builder"
+            aria-labelledby="suite-builder-heading"
+          >
+            <div>
+              <h3 id="suite-builder-heading">Persistent suite</h3>
+              <p>Choose the trials the API should run and retain in order.</p>
+            </div>
+            <label>
+              Suite name
+              <input
+                value={suiteName}
+                maxLength={SUITE_LIMITS.nameLength.max}
+                onChange={(event) => setSuiteName(event.target.value)}
+              />
+            </label>
+            <fieldset className="combination-picker">
+              <legend>Broker and scenario combinations</legend>
+              {ALL_COMBINATIONS.map((combination) => {
+                const key = combinationKey(combination);
+                return (
+                  <label key={key}>
+                    <input
+                      type="checkbox"
+                      checked={selectedCombinations.has(key)}
+                      onChange={() => toggleCombination(combination)}
+                    />
+                    <span>
+                      {BROKER_LABELS[combination.broker]} ·{' '}
+                      {SCENARIO_LABELS[combination.scenario]}
+                    </span>
+                  </label>
+                );
+              })}
+            </fieldset>
+            <div className="form-grid suite-options">
+              <NumberField
+                label="Repetitions"
+                value={repetitions}
+                limits={SUITE_LIMITS.repetitions}
+                onChange={setRepetitions}
+              />
+              <label>
+                Order
+                <select
+                  value={orderStrategy}
+                  onChange={(event) =>
+                    setOrderStrategy(event.target.value as SuiteOrderStrategy)
+                  }
+                >
+                  <option value="fixed">Fixed</option>
+                  <option value="rotating">Rotating</option>
+                  <option value="randomized">Randomized</option>
+                </select>
+              </label>
+              <NumberField
+                label="Cooldown (ms)"
+                value={cooldownMs}
+                limits={SUITE_LIMITS.cooldownMs}
+                onChange={setCooldownMs}
+              />
+            </div>
+            <p className="suite-size" aria-live="polite">
+              {selectedCombinations.size * repetitions} generated runs
+            </p>
+          </div>
         </fieldset>
+
         {validationError ? (
           <p className="form-error" role="alert">
             {validationError}
           </p>
         ) : null}
-        {batchProgress ? <BatchStatus progress={batchProgress} /> : null}
         <div className="experiment-actions">
           <button className="primary-button" type="submit" disabled={disabled}>
             <span aria-hidden="true">▶</span>
-            {disabled ? 'Experiment running' : 'Start experiment'}
+            {disabled ? 'Experiment running' : 'Start standalone run'}
           </button>
           <button
             className="secondary-button"
             type="button"
             disabled={disabled}
-            onClick={() => void runAll()}
+            onClick={() => void startSuite()}
           >
             <span aria-hidden="true">↻</span>
-            {batchProgress?.status === 'running'
-              ? `Running ${batchProgress.current} of ${batchProgress.total}`
-              : 'Run all 6 sequentially'}
+            Start benchmark suite
           </button>
         </div>
         <p className="suite-hint">
-          Uses these workload values for every broker and pattern. Runs are
-          sequential so results do not compete for local resources.
+          Suites continue on the server if this page closes or reloads.
         </p>
       </form>
     </section>
-  );
-}
-
-function BatchStatus({ progress }: { readonly progress: BatchProgress }) {
-  const message =
-    progress.status === 'completed'
-      ? 'Suite complete'
-      : progress.status === 'stopped'
-        ? 'Suite stopped'
-        : `Running experiment ${progress.current} of ${progress.total}`;
-
-  return (
-    <div className={`batch-status batch-${progress.status}`} aria-live="polite">
-      <div>
-        <strong>{message}</strong>
-        <span>
-          {progress.completed}/{progress.total} finished
-        </span>
-      </div>
-      <div className="batch-track" aria-hidden="true">
-        <span
-          style={{ width: `${(progress.completed / progress.total) * 100}%` }}
-        />
-      </div>
-    </div>
   );
 }
 
@@ -269,6 +356,10 @@ function NumberField({ label, value, limits, onChange }: NumberFieldProps) {
       </small>
     </label>
   );
+}
+
+function combinationKey({ broker, scenario }: SuiteCombination): string {
+  return `${broker}:${scenario}`;
 }
 
 function humanize(value: string): string {

@@ -49,18 +49,18 @@ This checklist continues from the completed MVP. Items are ordered by dependency
 
 ## 12. Suite experience in the dashboard
 
-- [ ] Replace the client-side “Run all 6” implementation with suite creation through the API.
-- [ ] Remove the browser-owned six-run queue after server-managed suites are available.
-- [ ] Allow users to choose broker/scenario combinations included in a suite.
-- [ ] Add repetition count, order strategy, and cooldown controls with safe defaults.
-- [ ] Display the current combination, repetition, overall progress, and remaining runs.
-- [ ] Restore an active suite after page reload.
-- [ ] Show failed, timed-out, and cancelled trials without silently dropping them.
-- [ ] Add suite history and suite-detail views.
-- [ ] Group individual runs under their suite while keeping standalone runs visible.
-- [ ] Add stable URL selection for runs and suites.
-- [ ] Add accessible progress announcements and keyboard navigation.
-- [ ] Add component tests for configuration, live progress, reload restoration, cancellation, and terminal states.
+- [x] Replace the client-side “Run all 6” implementation with suite creation through the API.
+- [x] Remove the browser-owned six-run queue after server-managed suites are available.
+- [x] Allow users to choose broker/scenario combinations included in a suite.
+- [x] Add repetition count, order strategy, and cooldown controls with safe defaults.
+- [x] Display the current combination, repetition, overall progress, and remaining runs.
+- [x] Restore an active suite after page reload.
+- [x] Show failed, timed-out, and cancelled trials without silently dropping them.
+- [x] Add suite history and suite-detail views.
+- [x] Group individual runs under their suite while keeping standalone runs visible.
+- [x] Add stable URL selection for runs and suites.
+- [x] Add accessible progress announcements and keyboard navigation.
+- [x] Add component tests for configuration, live progress, reload restoration, cancellation, and terminal states.
 
 ## 13. Repeated trials and statistical summaries
 

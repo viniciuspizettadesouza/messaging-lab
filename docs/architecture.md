@@ -38,35 +38,13 @@ responses and incoming SSE events are validated at the web boundary. Validation
 failures and structured server errors remain distinct from connectivity,
 conflict, timeout, and broker failures in the client.
 
-## Sequential runners
+## Persistent suite runner
 
-The dashboard's “Run all 6 sequentially” action is a client-side convenience.
-It expands the selected workload into the six broker/scenario combinations and
-submits one ordinary run at a time.
-
-```mermaid
-sequenceDiagram
-    participant Browser
-    participant API
-    participant Broker
-
-    loop Six broker/scenario combinations
-      Browser->>API: POST /api/runs
-      API->>Broker: Execute isolated benchmark
-      API-->>Browser: SSE progress and terminal status
-      Browser->>API: POST the next run
-    end
-```
-
-The queue exists only in browser memory. Reloading or closing the page discards
-the remaining queue, while an already active API run continues and can be
-rediscovered from run history.
-
-The API also exposes persistent suites. Suite clients submit a normalized
+The dashboard submits a normalized
 workload, broker/scenario combinations, repetitions, ordering strategy, and
 cooldown. The scheduler persists every ordered position first, then starts one
-ordinary run at a time through the same lifecycle manager. The dashboard will
-move to this API in the next UI milestone.
+ordinary run at a time through the same lifecycle manager. The browser only
+creates, observes, cancels, and displays this server-owned resource.
 
 ```mermaid
 sequenceDiagram
@@ -91,6 +69,11 @@ the first combination each repetition. Randomized order is shuffled once and
 stored, so reconnects and later inspection see the exact executed sequence.
 Failed, timed-out, and individually cancelled trials remain in the suite and do
 not prevent later trials from running.
+
+The suite lifecycle hook reconnects to active-suite SSE after reload. Stable
+`?suite=` and `?run=` selections restore detail views, and history nests suite
+trials beneath their owning suite while preserving standalone runs. All JSON
+responses and suite events are runtime-validated with the shared schemas.
 
 ## Run lifecycle
 

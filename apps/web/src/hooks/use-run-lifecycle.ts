@@ -91,7 +91,7 @@ export function useRunLifecycle({
   );
 
   const launchRun = useCallback(
-    async (request: StartRunRequest): Promise<boolean> => {
+    async (request: StartRunRequest): Promise<Run | null> => {
       setProgress(null);
       setDisconnected(false);
       try {
@@ -99,10 +99,10 @@ export function useRunLifecycle({
         setSelectedRun(run);
         addRun(run);
         watchRun(run.id);
-        return true;
+        return run;
       } catch (error) {
         onError(error);
-        return false;
+        return null;
       }
     },
     [addRun, api, onError, watchRun],

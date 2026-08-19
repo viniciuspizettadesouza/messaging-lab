@@ -1,194 +1,180 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-import {
-  BROKER_IDS,
-  SCENARIO_IDS,
-  type BrokerId,
-  type BrokerInfo,
-  type Run,
-  type ScenarioId,
-  type StartRunRequest,
+import type {
+  BrokerInfo,
+  CreateSuiteRequest,
+  Run,
+  StartRunRequest,
+  Suite,
 } from '@messaging-lab/shared';
 
 import { ApiClient, type DashboardApi } from './api/client.js';
 import { BrokerOverview } from './components/broker-overview.js';
 import { CapabilityMatrix } from './components/capability-matrix.js';
 import { ComparisonCharts } from './components/comparison-charts.js';
-import {
-  ExperimentForm,
-  type BatchProgress,
-} from './components/experiment-form.js';
+import { ExperimentForm } from './components/experiment-form.js';
 import { RunDetail } from './components/run-detail.js';
 import { RunHistory } from './components/run-history.js';
+import { SuiteDetail } from './components/suite-detail.js';
 import { useRunLifecycle } from './hooks/use-run-lifecycle.js';
+import { useSuiteLifecycle } from './hooks/use-suite-lifecycle.js';
 
 const defaultApi = new ApiClient();
-interface BatchQueue {
-  completed: number;
-  readonly total: number;
-  readonly remaining: StartRunRequest[];
-}
+
+type Selection =
+  | { readonly kind: 'run'; readonly id: string }
+  | { readonly kind: 'suite'; readonly id: string }
+  | null;
 
 export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
   const [brokers, setBrokers] = useState<BrokerInfo[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
+  const [suites, setSuites] = useState<Suite[]>([]);
+  const [selection, setSelection] = useState<Selection>(null);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState<string | null>(null);
-  const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(
-    null,
-  );
-  const batchQueueRef = useRef<BatchQueue | null>(null);
-  const advanceBatchRef = useRef<() => void>(() => undefined);
 
   const refreshRuns = useCallback(async () => {
     const nextRuns = await api.getRuns();
     setRuns(nextRuns);
     return nextRuns;
   }, [api]);
-
+  const refreshSuites = useCallback(async () => {
+    const nextSuites = await api.getSuites();
+    setSuites(nextSuites);
+    return nextSuites;
+  }, [api]);
   const reportError = useCallback((error: unknown) => {
     setPageError(errorMessage(error));
   }, []);
   const addRun = useCallback((run: Run) => {
     setRuns((current) => [run, ...current.filter(({ id }) => id !== run.id)]);
   }, []);
+  const upsertSuite = useCallback((suite: Suite) => {
+    setSuites((current) => [
+      suite,
+      ...current.filter(({ id }) => id !== suite.id),
+    ]);
+  }, []);
+
   const {
     selectedRun,
     progress,
-    disconnected,
+    disconnected: runDisconnected,
     launchRun,
-    cancelRun: cancelSelectedRun,
+    cancelRun,
     selectRun,
   } = useRunLifecycle({
     api,
     refreshRuns,
     addRun,
     onError: reportError,
-    onTerminal: () => advanceBatchRef.current(),
+    onTerminal: () => undefined,
   });
+  const {
+    selectedSuite,
+    disconnected: suiteDisconnected,
+    launchSuite,
+    cancelSuite,
+    selectSuite,
+  } = useSuiteLifecycle({
+    api,
+    refreshSuites,
+    upsertSuite,
+    refreshRuns,
+    onError: reportError,
+  });
+
+  const displayRun = useCallback(
+    (run: Run, updateUrl = true) => {
+      selectRun(run);
+      setSelection({ kind: 'run', id: run.id });
+      if (updateUrl) writeSelection('run', run.id);
+    },
+    [selectRun],
+  );
+  const displaySuite = useCallback(
+    (suite: Suite, updateUrl = true) => {
+      selectSuite(suite);
+      setSelection({ kind: 'suite', id: suite.id });
+      if (updateUrl) writeSelection('suite', suite.id);
+    },
+    [selectSuite],
+  );
 
   useEffect(() => {
     let active = true;
-    void Promise.all([api.getBrokers(), api.getRuns()])
-      .then(([nextBrokers, nextRuns]) => {
+    void (async () => {
+      try {
+        const [nextBrokers, nextRuns, nextSuites] = await Promise.all([
+          api.getBrokers(),
+          api.getRuns(),
+          api.getSuites(),
+        ]);
         if (!active) return;
         setBrokers(nextBrokers);
         setRuns(nextRuns);
-        const activeRun = nextRuns.find(
-          (run) => run.status === 'pending' || run.status === 'running',
-        );
-        if (activeRun) {
-          selectRun(activeRun);
+        setSuites(nextSuites);
+
+        const urlSelection = readSelection();
+        if (urlSelection?.kind === 'suite') {
+          const suite =
+            nextSuites.find(({ id }) => id === urlSelection.id) ??
+            (await api.getSuite(urlSelection.id));
+          if (active) displaySuite(suite, false);
+          return;
         }
-      })
-      .catch((error: unknown) => {
+        if (urlSelection?.kind === 'run') {
+          const run =
+            nextRuns.find(({ id }) => id === urlSelection.id) ??
+            (await api.getRun(urlSelection.id));
+          if (active) displayRun(run, false);
+          return;
+        }
+
+        const activeSuite = nextSuites.find(isActiveSuite);
+        if (activeSuite) {
+          displaySuite(activeSuite);
+          return;
+        }
+        const activeRun = nextRuns.find(isActiveRun);
+        if (activeRun) displayRun(activeRun);
+      } catch (error) {
         if (active) setPageError(errorMessage(error));
-      })
-      .finally(() => {
+      } finally {
         if (active) setLoading(false);
-      });
+      }
+    })();
     return () => {
       active = false;
     };
-  }, [api, selectRun]);
-
-  const advanceBatch = useCallback(async () => {
-    const batch = batchQueueRef.current;
-    if (!batch) return;
-    batch.completed += 1;
-    const next = batch.remaining.shift();
-
-    if (!next) {
-      batchQueueRef.current = null;
-      setBatchProgress({
-        completed: batch.total,
-        current: batch.total,
-        total: batch.total,
-        status: 'completed',
-      });
-      return;
-    }
-
-    setBatchProgress({
-      completed: batch.completed,
-      current: batch.completed + 1,
-      total: batch.total,
-      status: 'running',
-    });
-    await delay(100);
-    if (batchQueueRef.current !== batch) return;
-    if (!(await launchRun(next))) {
-      batchQueueRef.current = null;
-      setBatchProgress({
-        completed: batch.completed,
-        current: batch.completed + 1,
-        total: batch.total,
-        status: 'stopped',
-      });
-    }
-  }, [launchRun]);
-
-  useEffect(() => {
-    advanceBatchRef.current = () => void advanceBatch();
-  }, [advanceBatch]);
+  }, [api, displayRun, displaySuite]);
 
   async function startRun(request: StartRunRequest): Promise<void> {
-    batchQueueRef.current = null;
-    setBatchProgress(null);
     setPageError(null);
-    await launchRun(request);
-  }
-
-  async function runAll(request: StartRunRequest): Promise<void> {
-    setPageError(null);
-    const configurations = BROKER_IDS.flatMap((broker: BrokerId) =>
-      SCENARIO_IDS.map((scenario: ScenarioId) => ({
-        ...request,
-        broker,
-        scenario,
-      })),
-    );
-    const first = configurations.shift();
-    if (!first) return;
-
-    const batch: BatchQueue = {
-      completed: 0,
-      total: configurations.length + 1,
-      remaining: configurations,
-    };
-    batchQueueRef.current = batch;
-    setBatchProgress({ completed: 0, current: 1, total: 6, status: 'running' });
-    if (!(await launchRun(first))) {
-      batchQueueRef.current = null;
-      setBatchProgress({
-        completed: 0,
-        current: 1,
-        total: 6,
-        status: 'stopped',
-      });
+    const run = await launchRun(request);
+    if (run) {
+      setSelection({ kind: 'run', id: run.id });
+      writeSelection('run', run.id);
     }
   }
 
-  async function cancelRun(): Promise<void> {
-    if (!selectedRun) return;
-    const batch = batchQueueRef.current;
-    if (batch) {
-      batchQueueRef.current = null;
-      setBatchProgress({
-        completed: batch.completed,
-        current: batch.completed + 1,
-        total: batch.total,
-        status: 'stopped',
-      });
-    }
+  async function startSuite(request: CreateSuiteRequest): Promise<void> {
     setPageError(null);
-    await cancelSelectedRun();
+    const suite = await launchSuite(request);
+    if (suite) {
+      setSelection({ kind: 'suite', id: suite.id });
+      writeSelection('suite', suite.id);
+    }
   }
 
-  const active =
-    selectedRun?.status === 'pending' || selectedRun?.status === 'running';
-  const controlsDisabled =
-    Boolean(active) || batchProgress?.status === 'running';
+  const activeRun = runs.some(isActiveRun);
+  const activeSuite = suites.some(isActiveSuite);
+  const controlsDisabled = activeRun || activeSuite;
+  const showingSuite =
+    selection?.kind === 'suite' && selectedSuite?.id === selection.id;
+  const showingRun =
+    selection?.kind === 'run' && selectedRun?.id === selection.id;
 
   return (
     <div className="app-shell">
@@ -259,22 +245,35 @@ export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
             <div className="workspace-grid" id="experiment">
               <ExperimentForm
                 disabled={controlsDisabled}
-                batchProgress={batchProgress}
                 onStart={startRun}
-                onRunAll={runAll}
+                onStartSuite={startSuite}
               />
-              <RunDetail
-                run={selectedRun}
-                progress={progress}
-                disconnected={disconnected}
-                onCancel={cancelRun}
-              />
+              {showingSuite && selectedSuite ? (
+                <SuiteDetail
+                  suite={selectedSuite}
+                  disconnected={suiteDisconnected}
+                  onCancel={cancelSuite}
+                  onSelectRun={displayRun}
+                />
+              ) : (
+                <RunDetail
+                  run={showingRun ? selectedRun : null}
+                  progress={progress}
+                  disconnected={runDisconnected}
+                  onCancel={cancelRun}
+                />
+              )}
             </div>
             <div id="history">
               <RunHistory
                 runs={runs}
-                selectedRunId={selectedRun?.id ?? null}
-                onSelect={selectRun}
+                suites={suites}
+                selectedRunId={selection?.kind === 'run' ? selection.id : null}
+                selectedSuiteId={
+                  selection?.kind === 'suite' ? selection.id : null
+                }
+                onSelectRun={displayRun}
+                onSelectSuite={displaySuite}
               />
             </div>
             <ComparisonCharts runs={runs} />
@@ -295,12 +294,31 @@ export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
   );
 }
 
+function isActiveRun(run: Run): boolean {
+  return run.status === 'pending' || run.status === 'running';
+}
+
+function isActiveSuite(suite: Suite): boolean {
+  return suite.status === 'pending' || suite.status === 'running';
+}
+
+function readSelection(): Selection {
+  const parameters = new URLSearchParams(window.location.search);
+  const suiteId = parameters.get('suite');
+  if (suiteId) return { kind: 'suite', id: suiteId };
+  const runId = parameters.get('run');
+  return runId ? { kind: 'run', id: runId } : null;
+}
+
+function writeSelection(kind: 'run' | 'suite', id: string): void {
+  const url = new URL(window.location.href);
+  url.search = '';
+  url.searchParams.set(kind, id);
+  window.history.replaceState(null, '', url);
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error
     ? error.message
     : 'An unexpected error occurred.';
-}
-
-function delay(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
