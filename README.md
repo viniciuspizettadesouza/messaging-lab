@@ -8,6 +8,8 @@ This project is an educational lab, not a universal broker ranking. Results desc
 
 ## What you can explore
 
+- Compare durable fan-out and competing-consumer workloads in separate result groups; Redis Pub/Sub is shown only as an ephemeral live-delivery baseline.
+
 - Run live fan-out and competing-consumer experiments against three real brokers.
 - Queue all six broker/pattern combinations sequentially with one button.
 - Configure message count, payload size, producer concurrency, consumers, and timeout.

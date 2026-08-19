@@ -790,6 +790,93 @@ tbody tr.selected {
   grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
+.baseline-card {
+  display: grid;
+  grid-template-columns: 1.4fr 0.8fr;
+  gap: 28px;
+  align-items: center;
+  padding: 24px;
+  color: #f4f6ef;
+  background: #17221f;
+  border-radius: 14px;
+}
+.comparison-kind {
+  color: var(--green);
+  font:
+    700 10px ui-monospace,
+    'SFMono-Regular',
+    monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.baseline-card .comparison-kind {
+  color: var(--lime);
+}
+.baseline-copy h3,
+.comparison-group-heading h3 {
+  margin: 8px 0;
+  font-size: 19px;
+}
+.baseline-copy p,
+.comparison-group-heading p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.baseline-copy p {
+  max-width: 650px;
+  color: #b9c2be;
+}
+.baseline-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.baseline-metrics div {
+  display: grid;
+  gap: 7px;
+  padding: 16px;
+  background: rgb(255 255 255 / 7%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 10px;
+}
+.baseline-metrics span {
+  color: #b9c2be;
+  font-size: 10px;
+}
+.baseline-metrics strong {
+  font-size: 14px;
+}
+.comparison-group {
+  margin-top: 22px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+.comparison-group-heading {
+  display: flex;
+  gap: 30px;
+  align-items: end;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.comparison-group-heading p {
+  max-width: 540px;
+  color: var(--muted);
+  text-align: right;
+}
+.comparison-empty {
+  display: grid;
+  place-items: center;
+  min-height: 90px;
+  color: var(--muted);
+  border: 1px dashed #c9cbc3;
+  border-radius: 10px;
+  font-size: 11px;
+}
+.baseline-card > .comparison-empty {
+  color: #b9c2be;
+  border-color: rgb(255 255 255 / 20%);
+}
 .bar-chart {
   margin: 0;
   padding: 22px;
@@ -967,6 +1054,9 @@ footer p {
   .chart-grid {
     grid-template-columns: 1fr;
   }
+  .baseline-card {
+    grid-template-columns: 1fr;
+  }
 }
 @media (max-width: 700px) {
   .site-header {
@@ -985,6 +1075,14 @@ footer p {
     flex-direction: column;
   }
   .section-heading > p {
+    text-align: left;
+  }
+  .comparison-group-heading {
+    align-items: start;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .comparison-group-heading p {
     text-align: left;
   }
   .form-grid,
