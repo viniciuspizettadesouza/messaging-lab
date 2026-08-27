@@ -130,17 +130,17 @@ The completed baseline records what was built under the original three-system co
 
 ## 18. Recovery and replay experiments
 
-- [ ] Define broker-native experiment types instead of forcing them into the common performance comparison.
-- [ ] Add application-controlled consumer interruption at a deterministic progress point.
-- [ ] Demonstrate Redis Streams pending-message recovery and retained-message replay.
-- [ ] Demonstrate Kafka committed-offset recovery and explicit offset reset.
-- [ ] Demonstrate RabbitMQ unacknowledged-message redelivery.
-- [ ] Demonstrate Redis Pub/Sub loss while no subscriber is connected.
-- [ ] Record recovery time, redelivered messages, duplicates, loss, and errors.
-- [ ] Report unsupported replay behavior explicitly.
-- [ ] Guarantee resource cleanup after interruption, cancellation, timeout, and failure.
-- [ ] Add Docker-backed integration tests for every recovery path.
-- [ ] Add an educational UI that explains the expected and observed behavior.
+- [x] Define broker-native experiment types instead of forcing them into the common performance comparison.
+- [x] Add application-controlled consumer interruption at a deterministic progress point.
+- [x] Demonstrate Redis Streams pending-message recovery and retained-message replay.
+- [x] Demonstrate Kafka committed-offset recovery and explicit offset reset.
+- [x] Demonstrate RabbitMQ unacknowledged-message redelivery.
+- [x] Demonstrate Redis Pub/Sub loss while no subscriber is connected.
+- [x] Record recovery time, redelivered messages, duplicates, loss, and errors.
+- [x] Report unsupported replay behavior explicitly.
+- [x] Guarantee resource cleanup after interruption, cancellation, timeout, and failure.
+- [x] Add Docker-backed integration tests for every recovery path.
+- [x] Add an educational UI that explains the expected and observed behavior.
 
 ## 19. Ordering and backpressure experiments
 

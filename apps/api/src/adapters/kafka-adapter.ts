@@ -187,6 +187,62 @@ class KafkaRun implements BrokerRunResource {
     }
   }
 
+  public async resetReplay(onDelivery: DeliveryHandler): Promise<void> {
+    if (this.publishedMessages === 0) return;
+
+    const groupId = `${this.topic}-explicit-offset-reset`;
+    const latest = await this.admin.fetchTopicOffsets(this.topic);
+    await this.admin.setOffsets({
+      groupId,
+      topic: this.topic,
+      partitions: latest.map(({ partition, offset }) => ({
+        partition,
+        offset,
+      })),
+    });
+    await this.admin.resetOffsets({
+      groupId,
+      topic: this.topic,
+      earliest: true,
+    });
+
+    const consumer = this.kafka.consumer({
+      groupId,
+      allowAutoTopicCreation: false,
+    });
+    let receivedMessages = 0;
+    let resolveReplay: (() => void) | undefined;
+    let rejectReplay: ((error: Error) => void) | undefined;
+    const replayComplete = new Promise<void>((resolve, reject) => {
+      resolveReplay = resolve;
+      rejectReplay = reject;
+    });
+    const timeout = setTimeout(
+      () => rejectReplay?.(new Error('Kafka offset-reset replay timed out.')),
+      15_000,
+    );
+
+    try {
+      await consumer.connect();
+      await consumer.subscribe({ topic: this.topic, fromBeginning: true });
+      await consumer.run({
+        autoCommit: false,
+        eachMessage: async ({ message }) => {
+          if (!message.value)
+            throw new Error('Kafka delivered an empty replay message.');
+          await onDelivery(decodeMessage(message.value, 'kafka-offset-reset'));
+          receivedMessages += 1;
+          if (receivedMessages >= this.publishedMessages) resolveReplay?.();
+        },
+      });
+      await replayComplete;
+    } finally {
+      clearTimeout(timeout);
+      await consumer.stop().catch(() => undefined);
+      await consumer.disconnect().catch(() => undefined);
+    }
+  }
+
   public async demonstrateRecovery(
     message: OutboundMessage,
     onDelivery: DeliveryHandler,

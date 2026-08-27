@@ -28,6 +28,7 @@ This project is an educational lab, not a universal broker ranking. Results desc
 - Name experiments, save local workload presets, and compare compatible selections.
 - Explicitly delete terminal local history with suite-aware cascading.
 - See where persistence, acknowledgements, recovery, and replay are genuinely supported.
+- Run broker-native recovery and replay demonstrations with deterministic consumer interruption, observed delivery anomalies, and cleanup evidence.
 
 Suites are coordinated and persisted by the API, not the browser. They continue
 if the dashboard reloads or disconnects, retain their complete execution order,
@@ -71,9 +72,13 @@ See [local development](docs/local-development.md) for port overrides, logs, and
 flowchart LR
     Browser[React dashboard] -->|HTTP + SSE| API[Fastify API]
     API --> Engine[Benchmark engine]
+    API --> Recovery[Recovery/replay engine]
     Engine --> Redis[(Redis)]
     Engine --> Kafka[(Kafka)]
     Engine --> Rabbit[(RabbitMQ)]
+    Recovery --> Redis
+    Recovery --> Kafka
+    Recovery --> Rabbit
     API --> SQLite[(SQLite history)]
 ```
 

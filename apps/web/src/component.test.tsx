@@ -19,10 +19,32 @@ import { ComparisonCharts } from './components/comparison-charts.js';
 import { ExperimentForm } from './components/experiment-form.js';
 import { RunDetail } from './components/run-detail.js';
 import { RunHistory } from './components/run-history.js';
+import { RecoveryExperiments } from './components/recovery-experiments.js';
 import { SuiteDetail } from './components/suite-detail.js';
-import { brokers, createRun, createSuite } from './test/fixtures.js';
+import {
+  brokers,
+  createRecoveryResult,
+  createRun,
+  createSuite,
+} from './test/fixtures.js';
 
 describe('dashboard components', () => {
+  it('explains and reports broker-native recovery behavior', async () => {
+    const onRun = vi.fn(async () => createRecoveryResult());
+    render(<RecoveryExperiments disabled={false} onRun={onRun} />);
+
+    expect(screen.getByText('Expected behavior')).toBeInTheDocument();
+    expect(screen.getByText(/behavioral demonstrations/)).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Run recovery experiment' }),
+    );
+
+    expect(onRun).toHaveBeenCalledWith('redis-streams-pending-recovery');
+    expect(await screen.findByText('Observed behavior')).toBeInTheDocument();
+    expect(screen.getByText('12.0 ms')).toBeInTheDocument();
+    expect(screen.getByText(/Cleanup removed 2 of 2/)).toBeInTheDocument();
+  });
+
   it.each(['completed', 'failed', 'timed-out', 'cancelled'] as const)(
     'renders the %s terminal state',
     (status) => {
@@ -338,6 +360,7 @@ function staticApi(): DashboardApi {
     cancelSuite: vi.fn(async () => undefined),
     deleteSuite: vi.fn(async () => undefined),
     subscribeSuite: vi.fn(() => () => undefined),
+    startRecoveryExperiment: vi.fn(async () => createRecoveryResult()),
   };
 }
 

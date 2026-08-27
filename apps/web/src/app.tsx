@@ -6,6 +6,7 @@ import type {
   Run,
   StartRunRequest,
   Suite,
+  RecoveryExperimentType,
 } from '@messaging-lab/shared';
 
 import {
@@ -19,6 +20,7 @@ import { ComparisonCharts } from './components/comparison-charts.js';
 import { ExperimentForm } from './components/experiment-form.js';
 import { RunDetail } from './components/run-detail.js';
 import { RunHistory, type HistoryFilters } from './components/run-history.js';
+import { RecoveryExperiments } from './components/recovery-experiments.js';
 import { SuiteDetail } from './components/suite-detail.js';
 import { useRunLifecycle } from './hooks/use-run-lifecycle.js';
 import { useSuiteLifecycle } from './hooks/use-suite-lifecycle.js';
@@ -241,6 +243,21 @@ export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
     }
   }
 
+  async function startRecoveryExperiment(type: RecoveryExperimentType) {
+    setPageError(null);
+    try {
+      return await api.startRecoveryExperiment({
+        type,
+        messageCount: 5,
+        interruptAfterMessages: 2,
+        timeoutMs: 15_000,
+      });
+    } catch (error) {
+      reportError(error);
+      throw error;
+    }
+  }
+
   const activeRun = runs.some(isActiveRun);
   const activeSuite = suites.some(isActiveSuite);
   const controlsDisabled = activeRun || activeSuite;
@@ -339,6 +356,10 @@ export function App({ api = defaultApi }: { readonly api?: DashboardApi }) {
                 />
               )}
             </div>
+            <RecoveryExperiments
+              disabled={controlsDisabled}
+              onRun={startRecoveryExperiment}
+            />
             <div id="history">
               <RunHistory
                 runs={runs}

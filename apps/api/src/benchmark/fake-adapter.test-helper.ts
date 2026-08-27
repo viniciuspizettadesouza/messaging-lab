@@ -29,22 +29,41 @@ export class ImmediateAdapter implements BrokerAdapter {
     context: BrokerRunContext,
   ): Promise<BrokerRunResource> {
     let handler: DeliveryHandler | undefined;
+    const published: OutboundMessage[] = [];
+    const deliver = async (message: OutboundMessage) => {
+      if (!handler) return;
+      const deliveries =
+        context.scenario === 'fan-out'
+          ? Array.from({ length: context.consumerCount }, (_, index) =>
+              delivery(message, `consumer-${index + 1}`),
+            )
+          : [delivery(message, 'consumer-1')];
+      for (const value of deliveries) await handler(value);
+      if (this.duplicate) await handler(deliveries[0]!);
+    };
     return {
       resourceNames: ['fake-resource'],
       startConsumers: async (onDelivery) => {
         handler = onDelivery;
+        for (const message of published) await deliver(message);
       },
       publish: async (message) => {
         this.publishedPayloadSizes.push(message.payload.byteLength);
-        if (!handler) throw new Error('Consumers have not started.');
-        const deliveries =
-          context.scenario === 'fan-out'
-            ? Array.from({ length: context.consumerCount }, (_, index) =>
-                delivery(message, `consumer-${index + 1}`),
-              )
-            : [delivery(message, 'consumer-1')];
-        for (const value of deliveries) await handler(value);
-        if (this.duplicate) await handler(deliveries[0]!);
+        published.push(message);
+        await deliver(message);
+      },
+      replay: async (onDelivery) => {
+        for (const message of published) {
+          await onDelivery(delivery(message, 'replay-consumer'));
+        }
+      },
+      resetReplay: async (onDelivery) => {
+        for (const message of published) {
+          await onDelivery(delivery(message, 'offset-reset-consumer'));
+        }
+      },
+      demonstrateRecovery: async (message, onDelivery) => {
+        await onDelivery(delivery(message, 'recovered-consumer'));
       },
       cleanup: async () => {
         this.cleaned = true;

@@ -16,6 +16,31 @@ Returns API process health.
 
 Returns Redis, Kafka, and RabbitMQ protocol health plus capability metadata for each scenario. A broker can be unhealthy without preventing information about the other brokers from loading.
 
+### `POST /api/recovery-experiments`
+
+Runs one synchronous, broker-native recovery or replay demonstration. It is
+deliberately separate from benchmark runs and comparison tracks: its output is
+behavioral evidence, not a throughput or latency ranking.
+
+```json
+{
+  "type": "kafka-offset-reset-replay",
+  "messageCount": 5,
+  "interruptAfterMessages": 2,
+  "timeoutMs": 15000
+}
+```
+
+Supported types cover Redis Streams pending recovery and retained replay,
+Kafka committed-offset recovery and explicit offset reset, RabbitMQ
+unacknowledged redelivery, and Redis Pub/Sub offline loss. The response records
+the deterministic interruption point, expected and observed behavior, recovery
+time, received/redelivered/duplicate/lost/error counts, explicit replay support,
+and resource cleanup attempts and failures. Resources enter the same idempotent
+cleanup path after success, interruption, client cancellation, timeout, or
+failure. Results are returned to the caller and are not added to performance
+history.
+
 ### `POST /api/runs`
 
 Validates and starts one asynchronous benchmark. Returns `202 Accepted` with the pending run. Returns `409 Conflict` when another run is active.

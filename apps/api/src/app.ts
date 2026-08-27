@@ -9,6 +9,8 @@ import {
   createSuiteRequestSchema,
   deleteExperimentResponseSchema,
   errorResponseSchema,
+  recoveryExperimentRequestSchema,
+  recoveryExperimentResultSchema,
   runIdParamsSchema,
   runResponseSchema,
   runsQuerySchema,
@@ -39,6 +41,7 @@ import { RunRepository } from './run-repository.js';
 import { SuiteRepository } from './suite-repository.js';
 import { serializeSuiteCsv } from './suite-export.js';
 import { captureEnvironmentSnapshot } from './environment-snapshot.js';
+import { RecoveryExperimentEngine } from './recovery/recovery-engine.js';
 
 export interface Application {
   readonly app: FastifyInstance;
@@ -48,6 +51,7 @@ export interface Application {
   readonly suiteRepository: SuiteRepository;
   readonly suiteScheduler: SuiteScheduler;
   readonly suiteEvents: SuiteEventStore;
+  readonly recoveryEngine: RecoveryExperimentEngine;
 }
 
 export interface ApplicationOptions {
@@ -82,6 +86,7 @@ export function createApplication(
   const brokerHealthChecker =
     options.brokerHealthChecker ??
     (async (broker: BrokerId) => adapters[broker].checkHealth());
+  const recoveryEngine = new RecoveryExperimentEngine(adapters);
   const recoveredRuns = repository.recoverInterruptedRuns();
   const recoveredSuites = suiteRepository.recoverInterruptedSuites();
 
@@ -173,6 +178,21 @@ export function createApplication(
         capabilities: BROKER_CAPABILITIES[id],
       })),
     });
+  });
+
+  app.post('/api/recovery-experiments', async (request) => {
+    const experiment = recoveryExperimentRequestSchema.parse(request.body);
+    const controller = new AbortController();
+    const cancel = () =>
+      controller.abort(new Error('The client disconnected.'));
+    request.raw.once('aborted', cancel);
+    try {
+      return recoveryExperimentResultSchema.parse(
+        await recoveryEngine.execute(experiment, controller.signal),
+      );
+    } finally {
+      request.raw.off('aborted', cancel);
+    }
   });
 
   app.get('/api/runs', async (request) => {
@@ -439,6 +459,7 @@ export function createApplication(
     suiteRepository,
     suiteScheduler,
     suiteEvents,
+    recoveryEngine,
   };
 }
 

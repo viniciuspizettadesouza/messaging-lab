@@ -39,6 +39,8 @@ export interface BrokerRunResource {
   startConsumers(onDelivery: DeliveryHandler): Promise<void>;
   publish(message: OutboundMessage): Promise<void>;
   replay?(onDelivery: DeliveryHandler): Promise<void>;
+  /** Kafka uses this hook to make the offset reset explicit. */
+  resetReplay?(onDelivery: DeliveryHandler): Promise<void>;
   demonstrateRecovery?(
     message: OutboundMessage,
     onDelivery: DeliveryHandler,

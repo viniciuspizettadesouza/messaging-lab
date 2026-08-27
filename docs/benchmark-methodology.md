@@ -73,7 +73,8 @@ enter persisted run metrics or suite distributions. Loss, duplicates, and run
 errors are summed across successful trials, while errors attached to
 unsuccessful trials are also counted. The redelivery aggregate is currently
 zero because standard performance workloads do not intentionally interrupt
-consumers; recovery experiments will populate that measure.
+consumers; the separate recovery experiments populate that measure in their
+native behavioral observations.
 
 A suite may schedule combinations from multiple comparison tracks, but suite
 status summaries include per-track counts and distributions are presented under

@@ -16,6 +16,7 @@ import type {
 import { App } from './app.js';
 import {
   brokers,
+  createRecoveryResult,
   createRun,
   createSuite,
   runId,
@@ -333,6 +334,7 @@ function createApi(overrides: Partial<DashboardApi> = {}): FakeApi {
         suiteHandlers = null;
       };
     }),
+    startRecoveryExperiment: vi.fn(async () => createRecoveryResult()),
     ...overrides,
     emitRun(event) {
       runHandlers?.onEvent(event);

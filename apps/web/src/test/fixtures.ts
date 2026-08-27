@@ -7,11 +7,49 @@ import {
   type RunStatus,
   type Suite,
   type SuiteStatus,
+  type RecoveryExperimentResult,
 } from '@messaging-lab/shared';
 
 export const runId = '11111111-1111-4111-8111-111111111111';
 export const timestamp = '2026-08-18T12:00:00.000Z';
 export const suiteId = '22222222-2222-4222-8222-222222222222';
+
+export function createRecoveryResult(): RecoveryExperimentResult {
+  return {
+    id: '44444444-4444-4444-8444-444444444444',
+    type: 'redis-streams-pending-recovery',
+    broker: 'redis',
+    scenario: 'competing-consumers',
+    status: 'completed',
+    deterministicInterruption: { afterMessages: 2 },
+    replay: {
+      supported: true,
+      attempted: false,
+      explanation:
+        'Replay is supported by this broker, but this experiment exercised consumer recovery.',
+    },
+    expectedBehavior: 'A pending entry is claimed by a replacement consumer.',
+    observedBehavior:
+      '1 interrupted message was delivered to the replacement consumer.',
+    observations: {
+      recoveryTimeMs: 12,
+      publishedMessages: 5,
+      receivedMessages: 5,
+      redeliveredMessages: 1,
+      duplicateMessages: 0,
+      lostMessages: 0,
+      errorCount: 0,
+    },
+    resourceCleanup: {
+      attemptedResources: 2,
+      removedResources: 2,
+      failures: [],
+    },
+    errors: [],
+    startedAt: timestamp,
+    finishedAt: timestamp,
+  };
+}
 
 export const brokers: BrokerInfo[] = (
   ['redis', 'kafka', 'rabbitmq'] as const

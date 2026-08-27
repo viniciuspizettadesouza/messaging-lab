@@ -10,6 +10,7 @@ import {
   runEventSchema,
   runResponseSchema,
   runsResponseSchema,
+  recoveryExperimentResultSchema,
   suiteEventSchema,
   suiteResponseSchema,
   suitesResponseSchema,
@@ -81,6 +82,37 @@ describe('API', () => {
     expect(brokers.find(({ id }) => id === 'kafka')?.health.status).toBe(
       'healthy',
     );
+  });
+
+  it('runs broker-native recovery experiments outside performance history', async () => {
+    const response = await application.app.inject({
+      method: 'POST',
+      url: '/api/recovery-experiments',
+      payload: {
+        type: 'kafka-committed-offset-recovery',
+        messageCount: 5,
+        interruptAfterMessages: 2,
+        timeoutMs: 1_000,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(recoveryExperimentResultSchema.parse(response.json())).toMatchObject(
+      {
+        type: 'kafka-committed-offset-recovery',
+        status: 'completed',
+        deterministicInterruption: { afterMessages: 2 },
+        observations: {
+          publishedMessages: 5,
+          redeliveredMessages: 1,
+          duplicateMessages: 0,
+          lostMessages: 0,
+          errorCount: 0,
+        },
+        resourceCleanup: { failures: [] },
+      },
+    );
+    expect(application.repository.list({ limit: 20, offset: 0 }).total).toBe(0);
   });
 
   it('lists, filters, and retrieves persisted runs', async () => {

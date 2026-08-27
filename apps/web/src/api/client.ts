@@ -5,6 +5,8 @@ import {
   createSuiteRequestSchema,
   deleteExperimentResponseSchema,
   runEventSchema,
+  recoveryExperimentRequestSchema,
+  recoveryExperimentResultSchema,
   runResponseSchema,
   runsResponseSchema,
   startRunRequestSchema,
@@ -20,6 +22,8 @@ import {
   type SuiteEvent,
   type RunsResponse,
   type SuitesResponse,
+  type RecoveryExperimentRequest,
+  type RecoveryExperimentResult,
 } from '@messaging-lab/shared';
 
 import {
@@ -65,6 +69,9 @@ export interface DashboardApi {
   cancelSuite(suiteId: string): Promise<void>;
   deleteSuite(suiteId: string): Promise<void>;
   subscribeSuite(suiteId: string, handlers: SuiteEventHandlers): () => void;
+  startRecoveryExperiment(
+    request: RecoveryExperimentRequest,
+  ): Promise<RecoveryExperimentResult>;
 }
 
 export class ApiClient implements DashboardApi {
@@ -219,6 +226,20 @@ export class ApiClient implements DashboardApi {
     }
     source.onerror = () => handlers.onDisconnect();
     return () => source.close();
+  }
+
+  public async startRecoveryExperiment(
+    request: RecoveryExperimentRequest,
+  ): Promise<RecoveryExperimentResult> {
+    const body = recoveryExperimentRequestSchema.parse(request);
+    return parseResponse(
+      recoveryExperimentResultSchema,
+      await requestJson(`${this.baseUrl}/api/recovery-experiments`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+    );
   }
 }
 

@@ -3,6 +3,7 @@ export * from './broker-adapter.js';
 export * from './capabilities.js';
 export * from './configuration.js';
 export * from './domain.js';
+export * from './recovery.js';
 
 export const workspaceNames = {
   api: '@messaging-lab/api',

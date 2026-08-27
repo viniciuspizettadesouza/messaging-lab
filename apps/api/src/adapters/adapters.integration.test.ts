@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
 
+import { RECOVERY_EXPERIMENT_TYPES } from '@messaging-lab/shared';
 import type {
   BrokerAdapter,
   BrokerDelivery,
@@ -12,6 +13,7 @@ import type {
 import { KafkaAdapter } from './kafka-adapter.js';
 import { RabbitMqAdapter } from './rabbitmq-adapter.js';
 import { RedisAdapter } from './redis-adapter.js';
+import { RecoveryExperimentEngine } from '../recovery/recovery-engine.js';
 
 const describeIntegration =
   process.env.RUN_BROKER_INTEGRATION === '1' ? describe : describe.skip;
@@ -133,6 +135,32 @@ describeIntegration('broker adapters', () => {
             failures: [],
           });
         }
+      }
+    },
+    45_000,
+  );
+
+  it.each(RECOVERY_EXPERIMENT_TYPES)(
+    'demonstrates and cleans up %s',
+    async (type) => {
+      const registry = Object.fromEntries(
+        adapters.map(({ name, adapter }) => [name, adapter]),
+      ) as Record<'redis' | 'kafka' | 'rabbitmq', BrokerAdapter>;
+      const result = await new RecoveryExperimentEngine(registry).execute({
+        type,
+        messageCount: 5,
+        interruptAfterMessages: 2,
+        timeoutMs: 30_000,
+      });
+
+      expect(result.status).toBe('completed');
+      expect(result.errors).toEqual([]);
+      expect(result.resourceCleanup.failures).toEqual([]);
+      if (type === 'redis-pubsub-offline-loss') {
+        expect(result.observations.lostMessages).toBe(5);
+        expect(result.replay.supported).toBe(false);
+      } else {
+        expect(result.observations.lostMessages).toBe(0);
       }
     },
     45_000,
