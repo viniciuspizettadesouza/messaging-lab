@@ -17,78 +17,91 @@ export function summarizeSuiteCombinations(
   combinations: readonly SuiteCombination[],
   runs: readonly SuiteRun[],
 ): SuiteCombinationSummary[] {
-  return combinations.map((combination, combinationIndex) => {
-    const trials = runs.filter(
-      (trial) => trial.combinationIndex === combinationIndex,
-    );
-    const successful = trials.filter(
-      (trial) => trial.run?.status === 'completed' && trial.run.metrics,
-    );
-    const metrics = successful.flatMap((trial) =>
-      trial.run?.metrics ? [trial.run.metrics] : [],
-    );
-    const count = (status: RunStatus) =>
-      trials.filter((trial) => (trial.run?.status ?? 'pending') === status)
-        .length;
-
-    return {
-      combinationIndex,
-      combination,
-      comparisonTrack: comparisonTrackFor(
-        combination.broker,
-        combination.scenario,
-      ),
-      totalTrials: trials.length,
-      successfulTrials: successful.length,
-      unsuccessfulTrials: trials.filter(
+  return combinations.flatMap((combination, combinationIndex) => {
+    const sweepPoints = [
+      ...new Map(
+        runs
+          .filter((trial) => trial.combinationIndex === combinationIndex)
+          .map((trial) => [trial.sweepPointIndex, trial.sweepValue] as const),
+      ).entries(),
+    ];
+    return sweepPoints.map(([sweepPointIndex, sweepValue]) => {
+      const trials = runs.filter(
         (trial) =>
-          trial.run &&
-          (TERMINAL_UNSUCCESSFUL.has(trial.run.status) ||
-            (trial.run.status === 'completed' && !trial.run.metrics)),
-      ).length,
-      statusCounts: {
-        pending: count('pending'),
-        running: count('running'),
-        completed: count('completed'),
-        failed: count('failed'),
-        timedOut: count('timed-out'),
-        cancelled: count('cancelled'),
-      },
-      throughput: summarizeDistribution(
-        metrics.map(
-          ({ throughputMessagesPerSecond }) => throughputMessagesPerSecond,
+          trial.combinationIndex === combinationIndex &&
+          trial.sweepPointIndex === sweepPointIndex,
+      );
+      const successful = trials.filter(
+        (trial) => trial.run?.status === 'completed' && trial.run.metrics,
+      );
+      const metrics = successful.flatMap((trial) =>
+        trial.run?.metrics ? [trial.run.metrics] : [],
+      );
+      const count = (status: RunStatus) =>
+        trials.filter((trial) => (trial.run?.status ?? 'pending') === status)
+          .length;
+
+      return {
+        combinationIndex,
+        combination,
+        sweepPointIndex,
+        sweepValue,
+        comparisonTrack: comparisonTrackFor(
+          combination.broker,
+          combination.scenario,
         ),
-      ),
-      latency: {
-        p50Ms: summarizeDistribution(
-          metrics.map(({ latency }) => latency.p50Ms),
+        totalTrials: trials.length,
+        successfulTrials: successful.length,
+        unsuccessfulTrials: trials.filter(
+          (trial) =>
+            trial.run &&
+            (TERMINAL_UNSUCCESSFUL.has(trial.run.status) ||
+              (trial.run.status === 'completed' && !trial.run.metrics)),
+        ).length,
+        statusCounts: {
+          pending: count('pending'),
+          running: count('running'),
+          completed: count('completed'),
+          failed: count('failed'),
+          timedOut: count('timed-out'),
+          cancelled: count('cancelled'),
+        },
+        throughput: summarizeDistribution(
+          metrics.map(
+            ({ throughputMessagesPerSecond }) => throughputMessagesPerSecond,
+          ),
         ),
-        p95Ms: summarizeDistribution(
-          metrics.map(({ latency }) => latency.p95Ms),
-        ),
-        p99Ms: summarizeDistribution(
-          metrics.map(({ latency }) => latency.p99Ms),
-        ),
-      },
-      totals: {
-        publishedMessages: sum(
-          metrics.map(({ publishedMessages }) => publishedMessages),
-        ),
-        receivedMessages: sum(
-          metrics.map(({ receivedMessages }) => receivedMessages),
-        ),
-        lostMessages: sum(metrics.map(({ lostMessages }) => lostMessages)),
-        duplicateMessages: sum(
-          metrics.map(({ duplicateMessages }) => duplicateMessages),
-        ),
-        // Redelivery tracking is introduced by the recovery experiments. The
-        // current performance workloads cannot produce a redelivery count.
-        redeliveredMessages: 0,
-        errors:
-          sum(metrics.map(({ errorCount }) => errorCount)) +
-          sum(trials.map((trial) => trial.run?.errors.length ?? 0)),
-      },
-    };
+        latency: {
+          p50Ms: summarizeDistribution(
+            metrics.map(({ latency }) => latency.p50Ms),
+          ),
+          p95Ms: summarizeDistribution(
+            metrics.map(({ latency }) => latency.p95Ms),
+          ),
+          p99Ms: summarizeDistribution(
+            metrics.map(({ latency }) => latency.p99Ms),
+          ),
+        },
+        totals: {
+          publishedMessages: sum(
+            metrics.map(({ publishedMessages }) => publishedMessages),
+          ),
+          receivedMessages: sum(
+            metrics.map(({ receivedMessages }) => receivedMessages),
+          ),
+          lostMessages: sum(metrics.map(({ lostMessages }) => lostMessages)),
+          duplicateMessages: sum(
+            metrics.map(({ duplicateMessages }) => duplicateMessages),
+          ),
+          // Redelivery tracking is introduced by the recovery experiments. The
+          // current performance workloads cannot produce a redelivery count.
+          redeliveredMessages: 0,
+          errors:
+            sum(metrics.map(({ errorCount }) => errorCount)) +
+            sum(trials.map((trial) => trial.run?.errors.length ?? 0)),
+        },
+      };
+    });
   });
 }
 

@@ -58,6 +58,34 @@ describe('buildSuiteExecutionOrder', () => {
       0, 1, 2, 3, 4, 5,
     ]);
   });
+
+  it('expands one sweep dimension across every combination and repetition', () => {
+    const order = buildSuiteExecutionOrder({
+      ...configuration,
+      combinations: configuration.combinations.slice(0, 2),
+      repetitions: 2,
+      sweep: { parameter: 'consumerCount', values: [1, 4] },
+    });
+    expect(
+      order.map(
+        ({ combinationIndex, repetition, sweepPointIndex, sweepValue }) => ({
+          combinationIndex,
+          repetition,
+          sweepPointIndex,
+          sweepValue,
+        }),
+      ),
+    ).toEqual([
+      { combinationIndex: 0, repetition: 1, sweepPointIndex: 0, sweepValue: 1 },
+      { combinationIndex: 1, repetition: 1, sweepPointIndex: 0, sweepValue: 1 },
+      { combinationIndex: 0, repetition: 1, sweepPointIndex: 1, sweepValue: 4 },
+      { combinationIndex: 1, repetition: 1, sweepPointIndex: 1, sweepValue: 4 },
+      { combinationIndex: 0, repetition: 2, sweepPointIndex: 0, sweepValue: 1 },
+      { combinationIndex: 1, repetition: 2, sweepPointIndex: 0, sweepValue: 1 },
+      { combinationIndex: 0, repetition: 2, sweepPointIndex: 1, sweepValue: 4 },
+      { combinationIndex: 1, repetition: 2, sweepPointIndex: 1, sweepValue: 4 },
+    ]);
+  });
 });
 
 describe('SuiteScheduler', () => {
@@ -98,6 +126,25 @@ describe('SuiteScheduler', () => {
         expect.objectContaining({ type: 'status', status: 'completed' }),
       ]),
     );
+  });
+
+  it('applies sweep values to generated run configurations', async () => {
+    const { scheduler } = createScheduler(database, new ImmediateAdapter());
+    const suite = scheduler.start(
+      request({
+        ...configuration,
+        combinations: configuration.combinations.slice(0, 1),
+        repetitions: 1,
+        sweep: { parameter: 'payloadSizeBytes', values: [16, 64] },
+      }),
+    );
+
+    const completed = await scheduler.waitForCompletion(suite.id);
+    expect(completed.runs.map((trial) => trial.sweepValue)).toEqual([16, 64]);
+    expect(
+      completed.runs.map((trial) => trial.run?.configuration.payloadSizeBytes),
+    ).toEqual([16, 64]);
+    expect(completed.combinationSummaries).toHaveLength(2);
   });
 
   it('aborts cooldown and leaves queued work unstarted when cancelled', async () => {

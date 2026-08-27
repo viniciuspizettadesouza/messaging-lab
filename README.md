@@ -14,6 +14,7 @@ This project is an educational lab, not a universal broker ranking. Results desc
 - Run live fan-out and competing-consumer experiments against three real brokers.
 - Build persistent suites from selected broker/pattern combinations.
 - Configure suite repetitions, fixed/rotating/randomized order, and cooldown.
+- Sweep consumers, producers, payload size, or message count along one safe axis and inspect track-specific curves.
 - Configure message count, payload size, producer concurrency, consumers, and timeout.
 - Watch publishing and consumption progress through Server-Sent Events (SSE).
 - Compare throughput and p50/p95/p99 end-to-end latency.
@@ -32,6 +33,9 @@ Suites are coordinated and persisted by the API, not the browser. They continue
 if the dashboard reloads or disconnects, retain their complete execution order,
 and keep failed, timed-out, and cancelled trials visible. Distribution-aware
 aggregate statistics use successful trials without hiding unsuccessful ones.
+One-dimensional parameter sweeps expand into ordinary persisted suite trials,
+so they use the same repetition, ordering, cooldown, and cancellation behavior.
+A suite can generate at most 100 runs, including all sweep points.
 At creation, each new suite also records application/runtime versions, safe host
 characteristics, broker images, and sanitized adapter settings without storing
 hostnames, paths, endpoints, or credentials.

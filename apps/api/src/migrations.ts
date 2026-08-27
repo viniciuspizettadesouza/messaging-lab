@@ -134,6 +134,15 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX suite_runs_suite_id_run_id_idx ON suite_runs (suite_id, run_id);
     `,
   },
+  {
+    version: 5,
+    name: 'parameter sweep suite points',
+    sql: `
+      ALTER TABLE suite_runs ADD COLUMN sweep_point_index INTEGER CHECK (
+        sweep_point_index IS NULL OR sweep_point_index >= 0
+      );
+    `,
+  },
 ];
 
 export function migrateDatabase(database: DatabaseSync): void {

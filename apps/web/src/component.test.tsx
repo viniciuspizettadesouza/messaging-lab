@@ -89,7 +89,7 @@ describe('dashboard components', () => {
     expect(within(streams).getByText(/not a ranking/)).toBeInTheDocument();
   });
 
-  it('configures suite combinations, repetitions, order, and cooldown', async () => {
+  it('configures suite combinations, repetitions, ordering, cooldown, and a sweep', async () => {
     const onStartSuite = vi.fn(async () => undefined);
     render(
       <ExperimentForm
@@ -119,6 +119,16 @@ describe('dashboard components', () => {
     );
     await user.clear(cooldown);
     await user.type(cooldown, '500');
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: /Parameter sweep/ }),
+      'consumerCount',
+    );
+    const sweepValues = screen.getByRole('textbox', { name: /Sweep values/ });
+    await user.clear(sweepValues);
+    await user.type(sweepValues, '1, 2, 4');
+    expect(
+      screen.getByText('30 generated runs (maximum 100)'),
+    ).toBeInTheDocument();
     await user.click(
       screen.getByRole('button', { name: 'Start benchmark suite' }),
     );
@@ -128,6 +138,7 @@ describe('dashboard components', () => {
         repetitions: 2,
         orderStrategy: 'randomized',
         cooldownMs: 500,
+        sweep: { parameter: 'consumerCount', values: [1, 2, 4] },
         combinations: expect.not.arrayContaining([
           { broker: 'redis', scenario: 'fan-out' },
         ]),

@@ -79,6 +79,23 @@ A suite may schedule combinations from multiple comparison tracks, but suite
 status summaries include per-track counts and distributions are presented under
 track headings. No cross-track median, winner, or aggregate is calculated.
 
+## Parameter sweeps
+
+A suite may vary exactly one workload dimension: consumer count, producer
+count, payload size, or message count. Sweep values must be unique, strictly
+increasing integers inside the normal benchmark limits. Every selected
+broker/scenario combination runs at every value for every repetition; the
+expanded suite remains subject to the 100-run maximum. The base workload is
+unchanged except for the selected dimension.
+
+Sweep charts use the configuration value on the x-axis and the repeated-trial
+median on the y-axis. Curves remain separated by comparison track. A flattening
+throughput curve can suggest saturation or diminishing returns, while rising
+latency can suggest contention; neither establishes a broker-wide limit. These
+curves describe this local host, broker images, adapter configuration, Docker
+resources, and background load. Confirm apparent knees with repeated runs and
+controlled environments before drawing conclusions.
+
 ## Native capability demonstrations
 
 - Redis Streams and Kafka expose replay demonstrations because they retain an ordered log.

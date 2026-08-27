@@ -7,12 +7,13 @@ import {
   type ScenarioId,
 } from '@messaging-lab/shared';
 
-import { createRun } from '../test/fixtures.js';
+import { createRun, createSuite } from '../test/fixtures.js';
 import {
   comparisonGroupFor,
   latestCompletedRuns,
   runKey,
   selectComparisonGroups,
+  selectSweepCurveSummaries,
 } from './comparison.js';
 
 describe('comparison selectors', () => {
@@ -62,6 +63,30 @@ describe('comparison selectors', () => {
       adjacentStreaming: [],
       ephemeralBaseline: [redisPubSub],
     });
+  });
+
+  it('selects ordered sweep points only within one comparison track and combination', () => {
+    const suite = createSuite('completed', ['completed', 'completed']);
+    const primary = suite.combinationSummaries[1]!;
+    const baseline = suite.combinationSummaries[0]!;
+    const summaries = [
+      { ...primary, sweepPointIndex: 1, sweepValue: 4 },
+      { ...baseline, sweepPointIndex: 0, sweepValue: 1 },
+      { ...primary, sweepPointIndex: 0, sweepValue: 1 },
+    ];
+
+    expect(selectSweepCurveSummaries(summaries, 'primary', 1)).toEqual([
+      expect.objectContaining({ sweepValue: 1, comparisonTrack: 'primary' }),
+      expect.objectContaining({ sweepValue: 4, comparisonTrack: 'primary' }),
+    ]);
+    expect(
+      selectSweepCurveSummaries(summaries, 'ephemeral-baseline', 0),
+    ).toEqual([
+      expect.objectContaining({
+        sweepValue: 1,
+        comparisonTrack: 'ephemeral-baseline',
+      }),
+    ]);
   });
 });
 

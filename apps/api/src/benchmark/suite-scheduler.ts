@@ -159,6 +159,9 @@ export class SuiteScheduler {
 
         const run = this.runManager.start({
           ...initial.configuration.workload,
+          ...(initial.configuration.sweep && item.sweepValue !== null
+            ? { [initial.configuration.sweep.parameter]: item.sweepValue }
+            : {}),
           ...item.combination,
         });
         this.repository.attachRun(suiteId, item.position, run.id);
@@ -253,6 +256,15 @@ export function buildSuiteExecutionOrder(
 ): SuiteExecutionItem[] {
   const items: Omit<SuiteExecutionItem, 'position'>[] = [];
   const combinations = configuration.combinations;
+  const cases = (configuration.sweep?.values ?? [null]).flatMap(
+    (sweepValue, sweepPointIndex) =>
+      combinations.map((combination, combinationIndex) => ({
+        combination,
+        combinationIndex,
+        sweepPointIndex: sweepValue === null ? null : sweepPointIndex,
+        sweepValue,
+      })),
+  );
 
   for (
     let repetition = 1;
@@ -261,13 +273,12 @@ export function buildSuiteExecutionOrder(
   ) {
     const shift =
       configuration.orderStrategy === 'rotating'
-        ? (repetition - 1) % combinations.length
+        ? (repetition - 1) % cases.length
         : 0;
-    for (let offset = 0; offset < combinations.length; offset++) {
-      const combinationIndex = (offset + shift) % combinations.length;
-      const combination = combinations[combinationIndex];
-      if (!combination) throw new Error('Suite combination is missing.');
-      items.push({ combinationIndex, repetition, combination });
+    for (let offset = 0; offset < cases.length; offset++) {
+      const suiteCase = cases[(offset + shift) % cases.length];
+      if (!suiteCase) throw new Error('Suite case is missing.');
+      items.push({ ...suiteCase, repetition });
     }
   }
 

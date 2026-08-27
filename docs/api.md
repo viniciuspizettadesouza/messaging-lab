@@ -119,7 +119,11 @@ benchmark lane until it completes or is cancelled, including cooldown periods.
   ],
   "repetitions": 3,
   "orderStrategy": "rotating",
-  "cooldownMs": 1000
+  "cooldownMs": 1000,
+  "sweep": {
+    "parameter": "consumerCount",
+    "values": [1, 2, 4, 8]
+  }
 }
 ```
 
@@ -128,6 +132,10 @@ repetitions, fixed order, and a 1,000 ms cooldown. A suite accepts at most six
 unique combinations, 20 repetitions, a 60,000 ms cooldown, and 100 generated
 runs. Supported order strategies are `fixed`, `rotating`, and `randomized`.
 Randomized order is generated once and persisted with the suite.
+An optional one-dimensional `sweep` supports `consumerCount`,
+`producerConcurrency`, `payloadSizeBytes`, or `messageCount`. It requires 2–20
+unique, strictly increasing integer values inside the corresponding workload
+limit. Sweep points count toward the 100-run maximum.
 An optional description of at most 500 characters can accompany the required
 suite name.
 The example deliberately mixes the adjacent Redis Streams track with the
@@ -150,6 +158,8 @@ null `run`; started trials embed their persisted run. `combinationSummaries`
 contains success/failure counts, five-number throughput and p50/p95/p99 latency
 distributions, IQR, and aggregate delivery anomalies for each configured
 broker/scenario combination.
+For sweep suites, trials and summaries also contain `sweepPointIndex` and
+`sweepValue`; summaries are grouped by broker, scenario, and sweep point.
 Each trial and combination summary includes `comparisonTrack`; the suite lists
 its `comparisonTracks`, and `summary.byTrack` reports lifecycle counts without
 combining tracks.
@@ -166,7 +176,8 @@ Downloads the suite and all underlying trials. JSON uses the same validated
 suite contract as the detail endpoint. CSV emits one row per ordered trial,
 including queued and unsuccessful trials, configuration identity, lifecycle
 timestamps, metrics, anomaly counts, errors, and environment provenance.
-The `comparison_track` CSV column makes semantic boundaries explicit.
+The `comparison_track` CSV column makes semantic boundaries explicit;
+`sweep_parameter` and `sweep_value` preserve the curve axis.
 
 ### `POST /api/suites/:id/cancel`
 

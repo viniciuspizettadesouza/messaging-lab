@@ -927,6 +927,70 @@ label small {
   background: #f3f3ed;
   border-radius: 10px;
 }
+
+.sweep-curves {
+  margin-top: 1.5rem;
+}
+
+.sweep-curve-group {
+  margin: 0.75rem 0 1.25rem;
+}
+
+.sweep-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.curve-chart {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--paper);
+}
+
+.curve-chart figcaption {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.curve-chart svg {
+  display: block;
+  width: 100%;
+  height: 150px;
+  margin-top: 0.5rem;
+  overflow: visible;
+}
+
+.curve-chart line {
+  stroke: var(--line);
+  stroke-width: 0.75;
+}
+
+.curve-chart polyline {
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.curve-chart circle {
+  fill: var(--green);
+}
+
+.curve-x-axis {
+  position: relative;
+  height: 1.25rem;
+}
+
+.curve-x-axis span {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 0.75rem;
+}
 .aggregate-heading {
   display: flex;
   justify-content: space-between;

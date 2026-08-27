@@ -30,6 +30,8 @@ export interface SuiteExecutionItem {
   readonly combinationIndex: number;
   readonly repetition: number;
   readonly combination: SuiteCombination;
+  readonly sweepPointIndex?: number | null;
+  readonly sweepValue?: number | null;
 }
 
 export interface ListSuitesOptions {
@@ -67,6 +69,7 @@ interface SuiteRunRow {
   readonly broker: string;
   readonly scenario: string;
   readonly run_id: string | null;
+  readonly sweep_point_index: number | null;
 }
 
 interface SuiteErrorRow {
@@ -132,8 +135,9 @@ export class SuiteRepository {
         );
       const insertItem = this.database.prepare(
         `INSERT INTO suite_runs (
-          suite_id, position, combination_index, repetition, broker, scenario
-        ) VALUES (?, ?, ?, ?, ?, ?)`,
+          suite_id, position, combination_index, repetition, broker, scenario,
+          sweep_point_index
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       );
       for (const item of executionOrder) {
         insertItem.run(
@@ -143,6 +147,7 @@ export class SuiteRepository {
           item.repetition,
           item.combination.broker,
           item.combination.scenario,
+          item.sweepPointIndex ?? null,
         );
       }
       this.database
@@ -221,11 +226,24 @@ export class SuiteRepository {
     const suite = this.requireById(suiteId);
     const item = suite.runs[position];
     const run = this.runs.requireById(runId);
+    const expectedWorkload = item
+      ? {
+          ...suite.configuration.workload,
+          ...(suite.configuration.sweep && item.sweepValue != null
+            ? { [suite.configuration.sweep.parameter]: item.sweepValue }
+            : {}),
+        }
+      : null;
     if (
       !item ||
       item.position !== position ||
       run.configuration.broker !== item.combination.broker ||
-      run.configuration.scenario !== item.combination.scenario
+      run.configuration.scenario !== item.combination.scenario ||
+      !expectedWorkload ||
+      Object.entries(expectedWorkload).some(
+        ([field, value]) =>
+          run.configuration[field as keyof typeof expectedWorkload] !== value,
+      )
     ) {
       throw new Error(
         `Run ${runId} does not match suite ${suiteId} position ${position}.`,
@@ -351,7 +369,8 @@ export class SuiteRepository {
     );
     const itemRows = this.database
       .prepare(
-        `SELECT position, combination_index, repetition, broker, scenario, run_id
+        `SELECT position, combination_index, repetition, broker, scenario, run_id,
+                sweep_point_index
          FROM suite_runs WHERE suite_id = ? ORDER BY position`,
       )
       .all(row.id) as unknown as SuiteRunRow[];
@@ -372,6 +391,11 @@ export class SuiteRepository {
         combinationIndex: item.combination_index,
         repetition: item.repetition,
         combination: { broker: item.broker, scenario: item.scenario },
+        sweepPointIndex: item.sweep_point_index,
+        sweepValue:
+          item.sweep_point_index === null
+            ? null
+            : (configuration.sweep?.values[item.sweep_point_index] ?? null),
         comparisonTrack: comparisonTrackFor(
           item.broker as BrokerId,
           item.scenario as ScenarioId,
@@ -429,6 +453,7 @@ export class SuiteRepository {
         currentPosition: activeItem?.position ?? null,
         currentCombination: activeItem?.combination ?? null,
         currentRepetition: activeItem?.repetition ?? null,
+        currentSweepValue: activeItem?.sweepValue ?? null,
         activeRunId: activeItem?.run?.id ?? null,
       },
       summary: {
@@ -477,14 +502,22 @@ function validateExecutionOrder(
   executionOrder: readonly SuiteExecutionItem[],
 ): void {
   const expectedRuns =
-    configuration.combinations.length * configuration.repetitions;
+    configuration.combinations.length *
+    configuration.repetitions *
+    (configuration.sweep?.values.length ?? 1);
   const seen = new Set<string>();
   const valid =
     executionOrder.length === expectedRuns &&
     executionOrder.every((item, index) => {
       const configuredCombination =
         configuration.combinations[item.combinationIndex];
-      const key = `${item.repetition}:${item.combinationIndex}`;
+      const sweepPointIndex = item.sweepPointIndex ?? null;
+      const sweepValue = item.sweepValue ?? null;
+      const key = `${item.repetition}:${item.combinationIndex}:${sweepPointIndex ?? 'none'}`;
+      const configuredSweepValue =
+        sweepPointIndex === null
+          ? null
+          : (configuration.sweep?.values[sweepPointIndex] ?? null);
       if (
         item.position !== index ||
         item.repetition < 1 ||
@@ -492,6 +525,8 @@ function validateExecutionOrder(
         !configuredCombination ||
         configuredCombination.broker !== item.combination.broker ||
         configuredCombination.scenario !== item.combination.scenario ||
+        configuredSweepValue !== sweepValue ||
+        (!configuration.sweep && sweepPointIndex !== null) ||
         seen.has(key)
       ) {
         return false;

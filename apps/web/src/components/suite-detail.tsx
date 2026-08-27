@@ -3,6 +3,7 @@ import type {
   Run,
   Suite,
   SuiteCombinationSummary,
+  SweepParameter,
 } from '@messaging-lab/shared';
 
 import {
@@ -13,6 +14,7 @@ import {
   formatNumber,
 } from '../format.js';
 import { StatusBadge } from './status-badge.js';
+import { selectSweepCurveSummaries } from '../selectors/comparison.js';
 
 interface SuiteDetailProps {
   readonly suite: Suite;
@@ -103,6 +105,11 @@ export function SuiteDetail({
           <p className="current-repetition">
             Repetition {suite.progress.currentRepetition} of{' '}
             {suite.configuration.repetitions}
+            {suite.progress.currentSweepValue !== null &&
+            suite.progress.currentSweepValue !== undefined &&
+            suite.configuration.sweep
+              ? ` · ${sweepLabel(suite.configuration.sweep.parameter)} ${suite.progress.currentSweepValue}`
+              : ''}
           </p>
         ) : null}
         {active ? (
@@ -134,6 +141,8 @@ export function SuiteDetail({
       </div>
 
       <Provenance suite={suite} />
+
+      {suite.configuration.sweep ? <SweepCurves suite={suite} /> : null}
 
       {suite.stopReason ? (
         <div className="state-notice">
@@ -248,6 +257,12 @@ function Provenance({ suite }: { readonly suite: Suite }) {
             label="Cooldown"
             value={`${suite.configuration.cooldownMs} ms`}
           />
+          {suite.configuration.sweep ? (
+            <Definition
+              label="Sweep"
+              value={`${sweepLabel(suite.configuration.sweep.parameter)}: ${suite.configuration.sweep.values.join(', ')}`}
+            />
+          ) : null}
         </dl>
         {!environment ? (
           <p className="muted provenance-unavailable">
@@ -343,6 +358,143 @@ function formatBytes(bytes: number): string {
   return `${formatNumber(bytes / 1024 ** 3, 1)} GiB`;
 }
 
+function SweepCurves({ suite }: { readonly suite: Suite }) {
+  const sweep = suite.configuration.sweep;
+  if (!sweep) return null;
+  return (
+    <section className="sweep-curves" aria-labelledby="sweep-curves-heading">
+      <h3 id="sweep-curves-heading">Parameter sweep curves</h3>
+      <p className="muted">
+        Median results by {sweepLabel(sweep.parameter).toLowerCase()}; each
+        broker-native mechanism remains in its comparison track.
+      </p>
+      {suite.comparisonTracks.map((track) => (
+        <section
+          key={track}
+          aria-label={`${COMPARISON_TRACK_LABELS[track]} curves`}
+        >
+          <h4>{COMPARISON_TRACK_LABELS[track]}</h4>
+          {suite.configuration.combinations.map(
+            (combination, combinationIndex) => {
+              const points = selectSweepCurveSummaries(
+                suite.combinationSummaries,
+                track,
+                combinationIndex,
+              );
+              if (points.length === 0) return null;
+              const label = `${BROKER_LABELS[combination.broker]} · ${SCENARIO_LABELS[combination.scenario]}`;
+              return (
+                <article className="sweep-curve-group" key={combinationIndex}>
+                  <h5>{label}</h5>
+                  <div className="sweep-chart-grid">
+                    <CurveChart
+                      title="Median throughput"
+                      unit="msg/s"
+                      parameter={sweep.parameter}
+                      points={points.map((point) => ({
+                        x: point.sweepValue!,
+                        y: point.throughput?.median ?? null,
+                      }))}
+                    />
+                    <CurveChart
+                      title="Median p95 latency"
+                      unit="ms"
+                      parameter={sweep.parameter}
+                      points={points.map((point) => ({
+                        x: point.sweepValue!,
+                        y: point.latency.p95Ms?.median ?? null,
+                      }))}
+                    />
+                  </div>
+                </article>
+              );
+            },
+          )}
+        </section>
+      ))}
+    </section>
+  );
+}
+
+function CurveChart({
+  title,
+  unit,
+  parameter,
+  points,
+}: {
+  readonly title: string;
+  readonly unit: string;
+  readonly parameter: SweepParameter;
+  readonly points: readonly { readonly x: number; readonly y: number | null }[];
+}) {
+  const measured = points.filter(
+    (point): point is { x: number; y: number } => point.y !== null,
+  );
+  const maximum = Math.max(...measured.map(({ y }) => y), 1);
+  const xMinimum = Math.min(...points.map(({ x }) => x));
+  const xMaximum = Math.max(...points.map(({ x }) => x));
+  const xPosition = (value: number) =>
+    xMaximum === xMinimum
+      ? 50
+      : ((value - xMinimum) / (xMaximum - xMinimum)) * 92 + 4;
+  const coordinates = measured
+    .map(({ x, y }) => `${xPosition(x)},${54 - (y / maximum) * 48}`)
+    .join(' ');
+  return (
+    <figure
+      className="curve-chart"
+      aria-label={`${title} by ${sweepLabel(parameter)}`}
+    >
+      <figcaption>
+        <strong>{title}</strong>
+        <span>{unit}</span>
+      </figcaption>
+      {measured.length === 0 ? (
+        <p className="comparison-empty">No successful trials yet.</p>
+      ) : (
+        <svg
+          viewBox="0 0 100 60"
+          role="img"
+          aria-label={measured
+            .map(({ x, y }) => `${x}: ${formatNumber(y, 2)} ${unit}`)
+            .join(', ')}
+        >
+          <line x1="4" y1="54" x2="96" y2="54" />
+          <polyline points={coordinates} />
+          {measured.map(({ x, y }) => (
+            <circle
+              key={x}
+              cx={xPosition(x)}
+              cy={54 - (y / maximum) * 48}
+              r="2"
+            />
+          ))}
+        </svg>
+      )}
+      <div
+        className="curve-x-axis"
+        aria-label={`${sweepLabel(parameter)} x-axis`}
+      >
+        {points.map(({ x }) => (
+          <span key={x} style={{ left: `${xPosition(x)}%` }}>
+            {formatNumber(x)}
+          </span>
+        ))}
+      </div>
+      <small>{sweepLabel(parameter)}</small>
+    </figure>
+  );
+}
+
+function sweepLabel(parameter: SweepParameter): string {
+  return {
+    consumerCount: 'Consumers',
+    producerConcurrency: 'Producers',
+    payloadSizeBytes: 'Payload bytes',
+    messageCount: 'Messages',
+  }[parameter];
+}
+
 function CombinationAggregate({
   summary,
 }: {
@@ -353,7 +505,12 @@ function CombinationAggregate({
   return (
     <article className="aggregate-card" aria-label={`${label} trial summary`}>
       <div className="aggregate-heading">
-        <strong>{label}</strong>
+        <strong>
+          {label}
+          {summary.sweepValue !== null && summary.sweepValue !== undefined
+            ? ` · sweep value ${formatNumber(summary.sweepValue)}`
+            : ''}
+        </strong>
         <span>
           {summary.successfulTrials} successful · {summary.unsuccessfulTrials}{' '}
           unsuccessful

@@ -68,6 +68,7 @@ export const suiteProgressSchema = z
     currentPosition: z.number().int().nonnegative().nullable(),
     currentCombination: suiteCombinationSchema.nullable(),
     currentRepetition: z.number().int().positive().nullable(),
+    currentSweepValue: z.number().int().positive().nullable().optional(),
     activeRunId: runIdSchema.nullable(),
   })
   .strict()
@@ -199,6 +200,8 @@ export const suiteCombinationSummarySchema = z
   .object({
     combinationIndex: z.number().int().nonnegative(),
     combination: suiteCombinationSchema,
+    sweepPointIndex: z.number().int().nonnegative().nullable().optional(),
+    sweepValue: z.number().int().positive().nullable().optional(),
     comparisonTrack: comparisonTrackIdSchema,
     totalTrials: z.number().int().positive(),
     successfulTrials: z.number().int().nonnegative(),
@@ -225,6 +228,13 @@ export const suiteCombinationSummarySchema = z
   })
   .strict()
   .superRefine((summary, context) => {
+    if ((summary.sweepPointIndex == null) !== (summary.sweepValue == null)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Sweep point index and value must both be present or absent.',
+        path: ['sweepValue'],
+      });
+    }
     if (
       summary.comparisonTrack !==
       comparisonTrackFor(
@@ -270,11 +280,21 @@ export const suiteRunSchema = z
     combinationIndex: z.number().int().nonnegative(),
     repetition: z.number().int().positive(),
     combination: suiteCombinationSchema,
+    sweepPointIndex: z.number().int().nonnegative().nullable().optional(),
+    sweepValue: z.number().int().positive().nullable().optional(),
     comparisonTrack: comparisonTrackIdSchema,
     run: runSchema.nullable(),
   })
   .strict()
-  .superRefine(({ combination, comparisonTrack }, context) => {
+  .superRefine((run, context) => {
+    const { combination, comparisonTrack } = run;
+    if ((run.sweepPointIndex == null) !== (run.sweepValue == null)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Sweep point index and value must both be present or absent.',
+        path: ['sweepValue'],
+      });
+    }
     if (
       comparisonTrack !==
       comparisonTrackFor(combination.broker, combination.scenario)

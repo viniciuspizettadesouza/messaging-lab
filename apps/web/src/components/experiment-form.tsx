@@ -19,6 +19,7 @@ import {
   type StartRunRequest,
   type SuiteCombination,
   type SuiteOrderStrategy,
+  type SweepParameter,
   type WorkloadConfiguration,
 } from '@messaging-lab/shared';
 
@@ -38,6 +39,12 @@ const ALL_COMBINATIONS: SuiteCombination[] = BROKER_IDS.flatMap((broker) =>
   SCENARIO_IDS.map((scenario) => ({ broker, scenario })),
 );
 const PRESET_STORAGE_KEY = 'messaging-lab.workload-presets.v1';
+const SWEEP_LABELS: Record<SweepParameter, string> = {
+  consumerCount: 'Consumers',
+  producerConcurrency: 'Producers',
+  payloadSizeBytes: 'Payload size (bytes)',
+  messageCount: 'Message count',
+};
 interface WorkloadPreset {
   readonly name: string;
   readonly workload: WorkloadConfiguration;
@@ -80,6 +87,10 @@ export function ExperimentForm({
   const [cooldownMs, setCooldownMs] = useState<number>(
     SUITE_DEFAULTS.cooldownMs,
   );
+  const [sweepParameter, setSweepParameter] = useState<SweepParameter | 'none'>(
+    'none',
+  );
+  const [sweepValues, setSweepValues] = useState('1, 2, 4');
   const [selectedCombinations, setSelectedCombinations] = useState(
     () => new Set(ALL_COMBINATIONS.map(combinationKey)),
   );
@@ -107,6 +118,14 @@ export function ExperimentForm({
       repetitions,
       orderStrategy,
       cooldownMs,
+      ...(sweepParameter === 'none'
+        ? {}
+        : {
+            sweep: {
+              parameter: sweepParameter,
+              values: parseSweepValues(sweepValues),
+            },
+          }),
     };
     const parsed = createSuiteRequestSchema.safeParse(request);
     if (!parsed.success) {
@@ -423,8 +442,45 @@ export function ExperimentForm({
                 onChange={setCooldownMs}
               />
             </div>
+            <div className="form-grid two-columns sweep-options">
+              <label>
+                Parameter sweep
+                <select
+                  value={sweepParameter}
+                  onChange={(event) =>
+                    setSweepParameter(
+                      event.target.value as SweepParameter | 'none',
+                    )
+                  }
+                >
+                  <option value="none">No sweep</option>
+                  {Object.entries(SWEEP_LABELS).map(([parameter, label]) => (
+                    <option key={parameter} value={parameter}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Sweep values
+                <input
+                  value={sweepValues}
+                  disabled={sweepParameter === 'none'}
+                  aria-describedby="sweep-values-help"
+                  onChange={(event) => setSweepValues(event.target.value)}
+                />
+                <small id="sweep-values-help">
+                  Comma-separated, unique, increasing integers
+                </small>
+              </label>
+            </div>
             <p className="suite-size" aria-live="polite">
-              {selectedCombinations.size * repetitions} generated runs
+              {selectedCombinations.size *
+                repetitions *
+                (sweepParameter === 'none'
+                  ? 1
+                  : Math.max(parseSweepValues(sweepValues).length, 1))}{' '}
+              generated runs (maximum {SUITE_LIMITS.totalRuns.max})
             </p>
           </div>
         </fieldset>
@@ -480,6 +536,10 @@ function NumberField({ label, value, limits, onChange }: NumberFieldProps) {
       </small>
     </label>
   );
+}
+
+function parseSweepValues(value: string): number[] {
+  return value.split(',').map((part) => Number(part.trim()));
 }
 
 function combinationKey({ broker, scenario }: SuiteCombination): string {

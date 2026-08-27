@@ -143,6 +143,47 @@ describe('SuiteRepository', () => {
     expect(suites.requireById(completed.id).status).toBe('completed');
   });
 
+  it('persists sweep points and exposes the active value in progress', () => {
+    const sweepConfiguration: SuiteConfiguration = {
+      ...configuration,
+      combinations: configuration.combinations.slice(1),
+      sweep: { parameter: 'payloadSizeBytes', values: [16, 64] },
+    };
+    const combination = sweepConfiguration.combinations[0]!;
+    const sweepOrder = [16, 64].map((sweepValue, sweepPointIndex) => ({
+      position: sweepPointIndex,
+      combinationIndex: 0,
+      repetition: 1,
+      combination,
+      sweepPointIndex,
+      sweepValue,
+    }));
+    const suite = suites.create(
+      'Sweep suite',
+      sweepConfiguration,
+      sweepOrder,
+      testEnvironmentSnapshot,
+    );
+    const run = runs.create({
+      ...sweepConfiguration.workload,
+      ...combination,
+      payloadSizeBytes: 64,
+    });
+    suites.attachRun(suite.id, 1, run.id);
+
+    expect(suites.requireById(suite.id)).toMatchObject({
+      progress: { currentPosition: 1, currentSweepValue: 64 },
+      runs: [
+        { sweepPointIndex: 0, sweepValue: 16 },
+        { sweepPointIndex: 1, sweepValue: 64 },
+      ],
+      combinationSummaries: [
+        { sweepPointIndex: 0, sweepValue: 16 },
+        { sweepPointIndex: 1, sweepValue: 64 },
+      ],
+    });
+  });
+
   it('rejects an incomplete execution order transactionally', () => {
     expect(() =>
       suites.create(

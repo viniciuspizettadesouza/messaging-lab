@@ -27,8 +27,15 @@ export const SUITE_LIMITS = {
   cooldownMs: { min: 0, max: 60_000, default: 1_000 },
   combinations: { min: 1, max: 6 },
   totalRuns: { max: 100 },
+  sweepPoints: { min: 2, max: 20 },
   nameLength: { min: 1, max: 120 },
 } as const;
+export const SWEEP_PARAMETERS = [
+  'consumerCount',
+  'producerConcurrency',
+  'payloadSizeBytes',
+  'messageCount',
+] as const;
 export const EXPERIMENT_DESCRIPTION_MAX_LENGTH = 500;
 
 export const SUITE_DEFAULTS = {
@@ -71,6 +78,45 @@ export const suiteCombinationSchema = z
   })
   .strict();
 
+export const sweepParameterSchema = z.enum(SWEEP_PARAMETERS);
+export const parameterSweepSchema = z
+  .object({
+    parameter: sweepParameterSchema,
+    values: z
+      .array(z.number().int())
+      .min(SUITE_LIMITS.sweepPoints.min)
+      .max(SUITE_LIMITS.sweepPoints.max),
+  })
+  .strict()
+  .superRefine(({ parameter, values }, context) => {
+    const limits = BENCHMARK_LIMITS[parameter];
+    const seen = new Set<number>();
+    values.forEach((value, index) => {
+      if (value < limits.min || value > limits.max) {
+        context.addIssue({
+          code: 'custom',
+          message: `${parameter} sweep values must be between ${limits.min} and ${limits.max}.`,
+          path: ['values', index],
+        });
+      }
+      if (seen.has(value)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Sweep values must be unique.',
+          path: ['values', index],
+        });
+      }
+      seen.add(value);
+      if (index > 0 && value <= values[index - 1]!) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Sweep values must be in strictly increasing order.',
+          path: ['values', index],
+        });
+      }
+    });
+  });
+
 export const suiteNameSchema = z
   .string()
   .trim()
@@ -94,9 +140,10 @@ export const suiteConfigurationSchema = z
     repetitions: boundedInteger(SUITE_LIMITS.repetitions),
     orderStrategy: suiteOrderStrategySchema,
     cooldownMs: boundedInteger(SUITE_LIMITS.cooldownMs),
+    sweep: parameterSweepSchema.nullable().optional(),
   })
   .strict()
-  .superRefine(({ combinations, repetitions }, context) => {
+  .superRefine(({ combinations, repetitions, sweep }, context) => {
     const seen = new Set<string>();
 
     combinations.forEach(({ broker, scenario }, index) => {
@@ -111,7 +158,9 @@ export const suiteConfigurationSchema = z
       seen.add(key);
     });
 
-    if (combinations.length * repetitions > SUITE_LIMITS.totalRuns.max) {
+    const generatedRuns =
+      combinations.length * repetitions * (sweep?.values.length ?? 1);
+    if (generatedRuns > SUITE_LIMITS.totalRuns.max) {
       context.addIssue({
         code: 'custom',
         message: `A suite cannot generate more than ${SUITE_LIMITS.totalRuns.max} runs.`,
@@ -159,6 +208,7 @@ export const createSuiteRequestSchema = z
     cooldownMs: boundedInteger(SUITE_LIMITS.cooldownMs).default(
       SUITE_DEFAULTS.cooldownMs,
     ),
+    sweep: parameterSweepSchema.nullable().optional(),
   })
   .strict()
   .transform(({ name, description, ...configuration }) => ({
@@ -203,6 +253,8 @@ export const startRunRequestSchema = z
 export type RunConfiguration = z.infer<typeof runConfigurationSchema>;
 export type WorkloadConfiguration = z.infer<typeof workloadConfigurationSchema>;
 export type SuiteCombination = z.infer<typeof suiteCombinationSchema>;
+export type SweepParameter = z.infer<typeof sweepParameterSchema>;
+export type ParameterSweep = z.infer<typeof parameterSweepSchema>;
 export type SuiteName = z.infer<typeof suiteNameSchema>;
 export type SuiteConfiguration = z.infer<typeof suiteConfigurationSchema>;
 export type CreateSuiteRequest = z.input<typeof createSuiteRequestSchema>;

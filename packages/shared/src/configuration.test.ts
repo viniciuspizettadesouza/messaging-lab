@@ -169,6 +169,45 @@ describe('suiteConfigurationSchema', () => {
       }).success,
     ).toBe(false);
   });
+
+  it.each([
+    ['consumerCount', 1, 64],
+    ['producerConcurrency', 1, 32],
+    ['payloadSizeBytes', 1, 1_048_576],
+    ['messageCount', 1, 1_000_000],
+  ] as const)(
+    'accepts safe %s sweep boundaries',
+    (parameter, minimum, maximum) => {
+      expect(
+        suiteConfigurationSchema.parse({
+          ...suiteConfiguration,
+          sweep: { parameter, values: [minimum, maximum] },
+        }).sweep,
+      ).toEqual({ parameter, values: [minimum, maximum] });
+    },
+  );
+
+  it('rejects invalid sweep shapes and generated work above the suite cap', () => {
+    for (const values of [[1], [1, 1], [2, 1], [0, 1]]) {
+      expect(
+        suiteConfigurationSchema.safeParse({
+          ...suiteConfiguration,
+          sweep: { parameter: 'consumerCount', values },
+        }).success,
+      ).toBe(false);
+    }
+    expect(
+      suiteConfigurationSchema.safeParse({
+        ...suiteConfiguration,
+        combinations: suiteConfiguration.combinations.slice(0, 1),
+        repetitions: 6,
+        sweep: {
+          parameter: 'messageCount',
+          values: Array.from({ length: 20 }, (_, index) => index + 1),
+        },
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe('createSuiteRequestSchema', () => {

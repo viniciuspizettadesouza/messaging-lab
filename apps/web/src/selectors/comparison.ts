@@ -3,6 +3,7 @@ import type {
   ComparisonTrackId,
   Run,
   ScenarioId,
+  SuiteCombinationSummary,
 } from '@messaging-lab/shared';
 
 export interface ComparisonGroups {
@@ -51,6 +52,22 @@ export function selectComparisonGroups(runs: readonly Run[]): ComparisonGroups {
 
 export function runKey(broker: BrokerId, scenario: ScenarioId): string {
   return `${broker}:${scenario}`;
+}
+
+export function selectSweepCurveSummaries(
+  summaries: readonly SuiteCombinationSummary[],
+  comparisonTrack: ComparisonTrackId,
+  combinationIndex: number,
+): SuiteCombinationSummary[] {
+  return summaries
+    .filter(
+      (summary) =>
+        summary.comparisonTrack === comparisonTrack &&
+        summary.combinationIndex === combinationIndex &&
+        summary.sweepValue !== null &&
+        summary.sweepValue !== undefined,
+    )
+    .toSorted((left, right) => left.sweepValue! - right.sweepValue!);
 }
 
 function compact(values: Array<Run | undefined>): Run[] {

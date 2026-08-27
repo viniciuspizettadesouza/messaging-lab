@@ -117,16 +117,16 @@ The completed baseline records what was built under the original three-system co
 
 ## 17. Parameter sweep experiments
 
-- [ ] Define a one-dimensional sweep contract and maximum generated-work limit.
-- [ ] Generate safe consumer-count sweeps.
-- [ ] Generate safe producer-count sweeps.
-- [ ] Generate safe payload-size sweeps.
-- [ ] Generate safe message-count sweeps.
-- [ ] Reuse suite scheduling, repetition, ordering, cooldown, and cancellation.
-- [ ] Add curve charts with configuration values on the x-axis.
-- [ ] Keep Kafka-versus-RabbitMQ, Redis Streams, and Redis Pub/Sub sweep curves in their respective comparison tracks.
-- [ ] Explain saturation, diminishing returns, and local-machine limitations.
-- [ ] Add tests for sweep expansion, validation limits, progress, and visualization selectors.
+- [x] Define a one-dimensional sweep contract and maximum generated-work limit.
+- [x] Generate safe consumer-count sweeps.
+- [x] Generate safe producer-count sweeps.
+- [x] Generate safe payload-size sweeps.
+- [x] Generate safe message-count sweeps.
+- [x] Reuse suite scheduling, repetition, ordering, cooldown, and cancellation.
+- [x] Add curve charts with configuration values on the x-axis.
+- [x] Keep Kafka-versus-RabbitMQ, Redis Streams, and Redis Pub/Sub sweep curves in their respective comparison tracks.
+- [x] Explain saturation, diminishing returns, and local-machine limitations.
+- [x] Add tests for sweep expansion, validation limits, progress, and visualization selectors.
 
 ## 18. Recovery and replay experiments
 
