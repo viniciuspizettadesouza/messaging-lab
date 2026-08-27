@@ -7,6 +7,7 @@ import type {
 
 import {
   BROKER_LABELS,
+  COMPARISON_TRACK_LABELS,
   SCENARIO_LABELS,
   formatDate,
   formatNumber,
@@ -153,16 +154,24 @@ export function SuiteDetail({
       ) : null}
 
       <div className="suite-aggregates">
-        <h3>Repeated-trial distributions</h3>
+        <h3>Repeated-trial distributions by comparison track</h3>
         <p className="muted aggregate-intro">
           Completed trials contribute to distributions. Failed, timed-out, and
-          cancelled trials remain counted and available below.
+          cancelled trials remain counted. Mixed-track suites schedule work
+          together but never combine their aggregates or conclusions.
         </p>
-        {suite.combinationSummaries.map((summary) => (
-          <CombinationAggregate
-            key={summary.combinationIndex}
-            summary={summary}
-          />
+        {suite.comparisonTracks.map((track) => (
+          <section key={track} aria-label={COMPARISON_TRACK_LABELS[track]}>
+            <h4>{COMPARISON_TRACK_LABELS[track]}</h4>
+            {suite.combinationSummaries
+              .filter((summary) => summary.comparisonTrack === track)
+              .map((summary) => (
+                <CombinationAggregate
+                  key={summary.combinationIndex}
+                  summary={summary}
+                />
+              ))}
+          </section>
         ))}
       </div>
 

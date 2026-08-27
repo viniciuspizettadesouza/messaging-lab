@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   cancelRunResponseSchema,
+  comparisonSelectionSchema,
   runEventSchema,
   runSchema,
   runsQuerySchema,
@@ -27,6 +28,7 @@ describe('API schemas', () => {
         scenario: 'fan-out',
         ...BENCHMARK_DEFAULTS,
       },
+      comparisonTrack: 'ephemeral-baseline',
       status: 'pending',
       createdAt: timestamp,
       startedAt: null,
@@ -37,6 +39,20 @@ describe('API schemas', () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it('rejects comparison-track identities that contradict the mechanism', () => {
+    expect(
+      comparisonSelectionSchema.safeParse({
+        id: 'selection-1',
+        label: 'Redis Pub/Sub',
+        broker: 'redis',
+        scenario: 'fan-out',
+        comparisonTrack: 'primary',
+        throughputMessagesPerSecond: 100,
+        p95LatencyMs: 2,
+      }).success,
+    ).toBe(false);
   });
 
   it('coerces and bounds run-history pagination', () => {
@@ -89,6 +105,18 @@ describe('suite schemas', () => {
     failedRuns: 0,
     timedOutRuns: 0,
     cancelledRuns: 0,
+    byTrack: [
+      {
+        comparisonTrack: 'primary',
+        totalRuns: 2,
+        pendingRuns: 0,
+        runningRuns: 1,
+        completedRuns: 1,
+        failedRuns: 0,
+        timedOutRuns: 0,
+        cancelledRuns: 0,
+      },
+    ],
   };
 
   it('validates suite state, configuration, progress, and summary', () => {
@@ -107,6 +135,7 @@ describe('suite schemas', () => {
           orderStrategy: 'fixed',
           cooldownMs: 0,
         },
+        comparisonTracks: ['primary', 'adjacent-streaming'],
         progress,
         summary,
         combinationSummaries: [],

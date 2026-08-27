@@ -83,8 +83,22 @@ describe('SuiteRepository', () => {
 
     expect(completed).toMatchObject({
       status: 'completed',
+      comparisonTracks: ['primary', 'adjacent-streaming'],
       progress: { completedRuns: 1, totalRuns: 2 },
-      summary: { completedRuns: 1, pendingRuns: 1 },
+      summary: {
+        completedRuns: 1,
+        pendingRuns: 1,
+        byTrack: expect.arrayContaining([
+          expect.objectContaining({
+            comparisonTrack: 'adjacent-streaming',
+            totalRuns: 1,
+          }),
+          expect.objectContaining({
+            comparisonTrack: 'primary',
+            totalRuns: 1,
+          }),
+        ]),
+      },
       runs: [{ run: { id: run.id } }, { run: null }],
     });
     expect(

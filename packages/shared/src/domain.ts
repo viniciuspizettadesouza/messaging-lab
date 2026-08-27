@@ -23,6 +23,11 @@ export const SUITE_ORDER_STRATEGIES = [
   'rotating',
   'randomized',
 ] as const;
+export const COMPARISON_TRACK_IDS = [
+  'primary',
+  'adjacent-streaming',
+  'ephemeral-baseline',
+] as const;
 export const CAPABILITY_FLAGS = [
   'persistence',
   'acknowledgements',
@@ -35,6 +40,7 @@ export const scenarioIdSchema = z.enum(SCENARIO_IDS);
 export const runStatusSchema = z.enum(RUN_STATUSES);
 export const suiteStatusSchema = z.enum(SUITE_STATUSES);
 export const suiteOrderStrategySchema = z.enum(SUITE_ORDER_STRATEGIES);
+export const comparisonTrackIdSchema = z.enum(COMPARISON_TRACK_IDS);
 export const capabilityFlagSchema = z.enum(CAPABILITY_FLAGS);
 
 export const scenarioCapabilitiesSchema = z
@@ -93,8 +99,24 @@ export type ScenarioId = z.infer<typeof scenarioIdSchema>;
 export type RunStatus = z.infer<typeof runStatusSchema>;
 export type SuiteStatus = z.infer<typeof suiteStatusSchema>;
 export type SuiteOrderStrategy = z.infer<typeof suiteOrderStrategySchema>;
+export type ComparisonTrackId = z.infer<typeof comparisonTrackIdSchema>;
 export type CapabilityFlag = z.infer<typeof capabilityFlagSchema>;
 export type ScenarioCapabilities = z.infer<typeof scenarioCapabilitiesSchema>;
 export type BrokerCapabilities = z.infer<typeof brokerCapabilitiesSchema>;
 export type LatencyMetrics = z.infer<typeof latencyMetricsSchema>;
 export type BenchmarkMetrics = z.infer<typeof benchmarkMetricsSchema>;
+
+/**
+ * Classifies the mechanism exercised by the current adapters. Kafka and
+ * RabbitMQ are the architectural comparison; Redis Streams is an adjacent
+ * retained-stream track; Redis Pub/Sub is an ephemeral baseline.
+ */
+export function comparisonTrackFor(
+  broker: BrokerId,
+  scenario: ScenarioId,
+): ComparisonTrackId {
+  if (broker !== 'redis') return 'primary';
+  return scenario === 'competing-consumers'
+    ? 'adjacent-streaming'
+    : 'ephemeral-baseline';
+}

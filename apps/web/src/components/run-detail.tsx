@@ -2,6 +2,7 @@ import type { Run, RunEvent } from '@messaging-lab/shared';
 
 import {
   BROKER_LABELS,
+  COMPARISON_TRACK_LABELS,
   SCENARIO_LABELS,
   formatDate,
   formatNumber,
@@ -59,6 +60,9 @@ export function RunDetail({
             </p>
           ) : null}
           <p className="muted">Started {formatDate(run.createdAt)}</p>
+          <p className="muted">
+            {COMPARISON_TRACK_LABELS[run.comparisonTrack]}
+          </p>
           {run.description ? <p>{run.description}</p> : null}
         </div>
         <StatusBadge status={run.status} />

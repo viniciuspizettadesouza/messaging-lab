@@ -1,6 +1,7 @@
 import {
   BENCHMARK_DEFAULTS,
   BROKER_CAPABILITIES,
+  comparisonTrackFor,
   type BrokerInfo,
   type Run,
   type RunStatus,
@@ -30,6 +31,7 @@ export function createRun(status: RunStatus = 'pending'): Run {
     id: runId,
     name: null,
     description: null,
+    comparisonTrack: 'ephemeral-baseline',
     configuration: {
       broker: 'redis',
       scenario: 'fan-out',
@@ -82,6 +84,10 @@ export function createSuite(
       combinationIndex: position,
       repetition: 1,
       combination,
+      comparisonTrack: comparisonTrackFor(
+        combination.broker,
+        combination.scenario,
+      ),
       run: runStatus
         ? {
             ...createRun(runStatus),
@@ -90,6 +96,10 @@ export function createSuite(
               ...createRun(runStatus).configuration,
               ...combination,
             },
+            comparisonTrack: comparisonTrackFor(
+              combination.broker,
+              combination.scenario,
+            ),
           }
         : null,
     };
@@ -120,6 +130,7 @@ export function createSuite(
     return {
       combinationIndex,
       combination: trial.combination,
+      comparisonTrack: trial.comparisonTrack,
       totalTrials: 1,
       successfulTrials: runStatus === 'completed' ? 1 : 0,
       unsuccessfulTrials: ['failed', 'timed-out', 'cancelled'].includes(
@@ -164,6 +175,7 @@ export function createSuite(
       orderStrategy: 'fixed',
       cooldownMs: 0,
     },
+    comparisonTracks: ['primary', 'ephemeral-baseline'],
     progress: {
       completedRuns: terminal,
       totalRuns: runs.length,
@@ -181,6 +193,27 @@ export function createSuite(
       failedRuns: counts('failed'),
       timedOutRuns: counts('timed-out'),
       cancelledRuns: counts('cancelled'),
+      byTrack: (['primary', 'ephemeral-baseline'] as const).map(
+        (comparisonTrack) => {
+          const trackRuns = runs.filter(
+            (trial) => trial.comparisonTrack === comparisonTrack,
+          );
+          const trackCount = (runStatus: RunStatus) =>
+            trackRuns.filter(
+              (trial) => (trial.run?.status ?? 'pending') === runStatus,
+            ).length;
+          return {
+            comparisonTrack,
+            totalRuns: trackRuns.length,
+            pendingRuns: trackCount('pending'),
+            runningRuns: trackCount('running'),
+            completedRuns: trackCount('completed'),
+            failedRuns: trackCount('failed'),
+            timedOutRuns: trackCount('timed-out'),
+            cancelledRuns: trackCount('cancelled'),
+          };
+        },
+      ),
     },
     combinationSummaries,
     environment: {

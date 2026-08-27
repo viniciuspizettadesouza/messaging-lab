@@ -75,6 +75,10 @@ unsuccessful trials are also counted. The redelivery aggregate is currently
 zero because standard performance workloads do not intentionally interrupt
 consumers; recovery experiments will populate that measure.
 
+A suite may schedule combinations from multiple comparison tracks, but suite
+status summaries include per-track counts and distributions are presented under
+track headings. No cross-track median, winner, or aggregate is calculated.
+
 ## Native capability demonstrations
 
 - Redis Streams and Kafka expose replay demonstrations because they retain an ordered log.
@@ -121,10 +125,16 @@ than normalizing across materially different hosts.
 6. Reproduce the intended production topology and tuning before making an architecture decision.
 
 Manual dashboard comparisons preserve the same semantic boundaries as the
-default charts. Redis Pub/Sub fan-out is isolated as an ephemeral live
-baseline, Kafka and RabbitMQ fan-out form the durable fan-out group, and Redis
-Streams, Kafka, and RabbitMQ form the durable competing-consumer group. A
-selection spanning these boundaries is displayed as separate groups rather
-than rejected or ranked together.
+default charts. Kafka and RabbitMQ form the primary track and are compared only
+within the same scenario. Redis Streams is an adjacent streaming track. Redis
+Pub/Sub is an ephemeral baseline. A selection spanning tracks is labeled a
+semantic contrast and produces no shared winner, ranking, or aggregate.
+
+Equal inputs do not equalize broker mechanics. Kafka consumer-group parallelism
+is bounded by topic partitions; RabbitMQ behavior depends on exchange, binding,
+queue, prefetch, and acknowledgement topology; Redis Streams maintains
+consumer-group pending-entry state. See
+[ADR 0001](adr/0001-semantic-comparison-tracks.md) for official evidence and
+the exact adapter demonstrations.
 
 Messaging Lab is best used to learn how semantics affect observable behavior and to form hypotheses for application-specific testing.

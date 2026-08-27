@@ -38,6 +38,7 @@ describe('run row mapping', () => {
         ],
       ),
     ).toMatchObject({
+      comparisonTrack: 'adjacent-streaming',
       configuration: { messageCount: BENCHMARK_DEFAULTS.messageCount },
       notes: ['Retained stream.'],
       errors: [{ details: { retryable: true } }],

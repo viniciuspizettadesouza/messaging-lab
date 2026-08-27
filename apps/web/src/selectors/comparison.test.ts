@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import type { BrokerId, Run, ScenarioId } from '@messaging-lab/shared';
+import {
+  comparisonTrackFor,
+  type BrokerId,
+  type Run,
+  type ScenarioId,
+} from '@messaging-lab/shared';
 
 import { createRun } from '../test/fixtures.js';
 import {
@@ -48,13 +53,14 @@ describe('comparison selectors', () => {
       3,
     );
 
-    expect(comparisonGroupFor(redisPubSub)).toBe('ephemeral-live');
+    expect(comparisonGroupFor(redisPubSub)).toBe('ephemeral-baseline');
     expect(
       selectComparisonGroups([redisPubSub, kafkaFanOut, rabbitWorkers]),
     ).toEqual({
-      ephemeralLive: [redisPubSub],
-      durableFanOut: [kafkaFanOut],
-      durableCompetingConsumers: [rabbitWorkers],
+      primaryFanOut: [kafkaFanOut],
+      primaryCompetingConsumers: [rabbitWorkers],
+      adjacentStreaming: [],
+      ephemeralBaseline: [redisPubSub],
     });
   });
 });
@@ -69,6 +75,7 @@ function result(
     ...createRun('completed'),
     id: `11111111-1111-4111-8111-${String(index).padStart(12, '0')}`,
     configuration: { ...createRun().configuration, broker, scenario },
+    comparisonTrack: comparisonTrackFor(broker, scenario),
     createdAt,
   };
 }

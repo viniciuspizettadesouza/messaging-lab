@@ -11,6 +11,8 @@ import {
   benchmarkMetricsSchema,
   brokerCapabilitiesSchema,
   brokerIdSchema,
+  comparisonTrackIdSchema,
+  comparisonTrackFor,
   runStatusSchema,
   suiteStatusSchema,
 } from './domain.js';
@@ -34,6 +36,7 @@ export const runSchema = z
     name: suiteNameSchema.nullable(),
     description: experimentDescriptionSchema,
     configuration: runConfigurationSchema,
+    comparisonTrack: comparisonTrackIdSchema,
     status: runStatusSchema,
     createdAt: isoTimestampSchema,
     startedAt: isoTimestampSchema.nullable(),
@@ -42,7 +45,19 @@ export const runSchema = z
     notes: z.array(z.string().min(1)),
     errors: z.array(runErrorSchema),
   })
-  .strict();
+  .strict()
+  .superRefine(({ configuration, comparisonTrack }, context) => {
+    if (
+      comparisonTrack !==
+      comparisonTrackFor(configuration.broker, configuration.scenario)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Comparison track must match the broker-native mechanism.',
+        path: ['comparisonTrack'],
+      });
+    }
+  });
 
 export const suiteErrorSchema = runErrorSchema;
 
@@ -82,6 +97,20 @@ export const suiteSummarySchema = z
     failedRuns: z.number().int().nonnegative(),
     timedOutRuns: z.number().int().nonnegative(),
     cancelledRuns: z.number().int().nonnegative(),
+    byTrack: z.array(
+      z
+        .object({
+          comparisonTrack: comparisonTrackIdSchema,
+          totalRuns: z.number().int().positive(),
+          pendingRuns: z.number().int().nonnegative(),
+          runningRuns: z.number().int().nonnegative(),
+          completedRuns: z.number().int().nonnegative(),
+          failedRuns: z.number().int().nonnegative(),
+          timedOutRuns: z.number().int().nonnegative(),
+          cancelledRuns: z.number().int().nonnegative(),
+        })
+        .strict(),
+    ),
   })
   .strict()
   .superRefine((summary, context) => {
@@ -99,6 +128,33 @@ export const suiteSummarySchema = z
         message: 'Suite summary counts must equal total runs.',
         path: ['totalRuns'],
       });
+    }
+    const trackTotal = summary.byTrack.reduce(
+      (total, track) => total + track.totalRuns,
+      0,
+    );
+    if (trackTotal !== summary.totalRuns) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Comparison-track counts must equal total runs.',
+        path: ['byTrack'],
+      });
+    }
+    for (const [index, track] of summary.byTrack.entries()) {
+      const trackStatuses =
+        track.pendingRuns +
+        track.runningRuns +
+        track.completedRuns +
+        track.failedRuns +
+        track.timedOutRuns +
+        track.cancelledRuns;
+      if (trackStatuses !== track.totalRuns) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Comparison-track status counts must equal track runs.',
+          path: ['byTrack', index],
+        });
+      }
     }
   });
 
@@ -143,6 +199,7 @@ export const suiteCombinationSummarySchema = z
   .object({
     combinationIndex: z.number().int().nonnegative(),
     combination: suiteCombinationSchema,
+    comparisonTrack: comparisonTrackIdSchema,
     totalTrials: z.number().int().positive(),
     successfulTrials: z.number().int().nonnegative(),
     unsuccessfulTrials: z.number().int().nonnegative(),
@@ -168,6 +225,19 @@ export const suiteCombinationSummarySchema = z
   })
   .strict()
   .superRefine((summary, context) => {
+    if (
+      summary.comparisonTrack !==
+      comparisonTrackFor(
+        summary.combination.broker,
+        summary.combination.scenario,
+      )
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Comparison track must match the suite combination.',
+        path: ['comparisonTrack'],
+      });
+    }
     const statusTotal = Object.values(summary.statusCounts).reduce(
       (total, count) => total + count,
       0,
@@ -200,9 +270,22 @@ export const suiteRunSchema = z
     combinationIndex: z.number().int().nonnegative(),
     repetition: z.number().int().positive(),
     combination: suiteCombinationSchema,
+    comparisonTrack: comparisonTrackIdSchema,
     run: runSchema.nullable(),
   })
-  .strict();
+  .strict()
+  .superRefine(({ combination, comparisonTrack }, context) => {
+    if (
+      comparisonTrack !==
+      comparisonTrackFor(combination.broker, combination.scenario)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Comparison track must match the suite combination.',
+        path: ['comparisonTrack'],
+      });
+    }
+  });
 
 const brokerEnvironmentSchema = z
   .object({
@@ -273,6 +356,7 @@ export const suiteSchema = z
     description: experimentDescriptionSchema,
     status: suiteStatusSchema,
     configuration: suiteConfigurationSchema,
+    comparisonTracks: z.array(comparisonTrackIdSchema).min(1),
     progress: suiteProgressSchema,
     summary: suiteSummarySchema,
     combinationSummaries: z.array(suiteCombinationSummarySchema),
@@ -375,6 +459,30 @@ export const runsResponseSchema = z
     offset: z.number().int().nonnegative(),
   })
   .strict();
+
+export const comparisonSelectionSchema = z
+  .object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    broker: brokerIdSchema,
+    scenario: z.enum(['fan-out', 'competing-consumers']),
+    comparisonTrack: comparisonTrackIdSchema,
+    throughputMessagesPerSecond: z.number().finite().nonnegative(),
+    p95LatencyMs: z.number().finite().nonnegative().nullable(),
+  })
+  .strict()
+  .superRefine((selection, context) => {
+    if (
+      selection.comparisonTrack !==
+      comparisonTrackFor(selection.broker, selection.scenario)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Comparison track must match the selected mechanism.',
+        path: ['comparisonTrack'],
+      });
+    }
+  });
 
 export const cancelRunResponseSchema = z
   .object({
@@ -517,6 +625,7 @@ export type RunResponse = z.infer<typeof runResponseSchema>;
 export type RunIdParams = z.infer<typeof runIdParamsSchema>;
 export type RunsQuery = z.output<typeof runsQuerySchema>;
 export type RunsResponse = z.infer<typeof runsResponseSchema>;
+export type ComparisonSelection = z.infer<typeof comparisonSelectionSchema>;
 export type CancelRunResponse = z.infer<typeof cancelRunResponseSchema>;
 export type DeleteExperimentResponse = z.infer<
   typeof deleteExperimentResponseSchema

@@ -10,6 +10,7 @@ import {
   SUITE_DEFAULTS,
   SUITE_LIMITS,
   createSuiteRequestSchema,
+  comparisonTrackFor,
   startRunRequestSchema,
   workloadConfigurationSchema,
   type BrokerId,
@@ -21,7 +22,11 @@ import {
   type WorkloadConfiguration,
 } from '@messaging-lab/shared';
 
-import { BROKER_LABELS, SCENARIO_LABELS } from '../format.js';
+import {
+  BROKER_LABELS,
+  COMPARISON_TRACK_LABELS,
+  SCENARIO_LABELS,
+} from '../format.js';
 
 interface ExperimentFormProps {
   readonly disabled: boolean;
@@ -341,7 +346,10 @@ export function ExperimentForm({
           >
             <div>
               <h3 id="suite-builder-heading">Persistent suite</h3>
-              <p>Choose the trials the API should run and retain in order.</p>
+              <p>
+                Choose trials from any track. Scheduling may be mixed; results
+                and conclusions remain separated by track.
+              </p>
             </div>
             <label>
               Suite name
@@ -373,6 +381,16 @@ export function ExperimentForm({
                     <span>
                       {BROKER_LABELS[combination.broker]} ·{' '}
                       {SCENARIO_LABELS[combination.scenario]}
+                      <small aria-hidden="true">
+                        {
+                          COMPARISON_TRACK_LABELS[
+                            comparisonTrackFor(
+                              combination.broker,
+                              combination.scenario,
+                            )
+                          ]
+                        }
+                      </small>
                     </span>
                   </label>
                 );

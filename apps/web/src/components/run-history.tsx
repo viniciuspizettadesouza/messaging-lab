@@ -5,10 +5,12 @@ import {
   SCENARIO_IDS,
   type Run,
   type Suite,
+  type ComparisonSelection,
 } from '@messaging-lab/shared';
 
 import {
   BROKER_LABELS,
+  COMPARISON_TRACK_LABELS,
   SCENARIO_LABELS,
   formatDate,
   formatNumber,
@@ -400,19 +402,21 @@ function ManualComparison({
   readonly suites: Suite[];
   readonly comparisonIds: ReadonlySet<string>;
 }) {
-  const entries = [
+  const entries: ComparisonSelection[] = [
     ...runs
       .filter(({ id }) => comparisonIds.has(`run:${id}`))
       .flatMap((run) =>
         run.metrics
           ? [
               {
-                key: `run:${run.id}`,
+                id: `run:${run.id}`,
                 label: run.name ?? `Run ${run.id.slice(0, 8)}`,
                 broker: run.configuration.broker,
                 scenario: run.configuration.scenario,
-                throughput: run.metrics.throughputMessagesPerSecond,
-                p95Latency: run.metrics.latency.p95Ms,
+                comparisonTrack: run.comparisonTrack,
+                throughputMessagesPerSecond:
+                  run.metrics.throughputMessagesPerSecond,
+                p95LatencyMs: run.metrics.latency.p95Ms,
               },
             ]
           : [],
@@ -424,12 +428,13 @@ function ManualComparison({
           summary.throughput
             ? [
                 {
-                  key: `suite:${suite.id}:${summary.combinationIndex}`,
+                  id: `suite:${suite.id}:${summary.combinationIndex}`,
                   label: suite.name,
                   broker: summary.combination.broker,
                   scenario: summary.combination.scenario,
-                  throughput: summary.throughput.median,
-                  p95Latency: summary.latency.p95Ms?.median ?? null,
+                  comparisonTrack: summary.comparisonTrack,
+                  throughputMessagesPerSecond: summary.throughput.median,
+                  p95LatencyMs: summary.latency.p95Ms?.median ?? null,
                 },
               ]
             : [],
@@ -439,35 +444,44 @@ function ManualComparison({
   if (comparisonIds.size === 0) return null;
   const groups = new Map<string, typeof entries>();
   for (const entry of entries) {
-    const group = comparisonGroup(entry.broker, entry.scenario);
+    const group = `${entry.comparisonTrack}:${entry.scenario}`;
     groups.set(group, [...(groups.get(group) ?? []), entry]);
   }
+  const selectedTracks = new Set(entries.map((entry) => entry.comparisonTrack));
+  const isSemanticContrast = selectedTracks.size > 1;
   return (
     <section
       className="manual-comparison"
       aria-labelledby="manual-comparison-heading"
     >
-      <h3 id="manual-comparison-heading">Manual comparison</h3>
+      <h3 id="manual-comparison-heading">
+        {isSemanticContrast ? 'Semantic contrasts' : 'Manual comparison'}
+      </h3>
       <p>
-        Semantically incompatible selections are separated into distinct groups.
+        {isSemanticContrast
+          ? 'Cross-track values are context-only contrasts. No shared winner, ranking, or combined aggregate is produced.'
+          : 'Results remain separated by workload pattern within their comparison track.'}
       </p>
       {entries.length === 0 ? (
         <p>No selected experiment has completed metrics.</p>
       ) : null}
       {[...groups].map(([group, groupEntries]) => (
         <article key={group}>
-          <h4>{group}</h4>
+          <h4>
+            {COMPARISON_TRACK_LABELS[groupEntries[0]!.comparisonTrack]} ·{' '}
+            {SCENARIO_LABELS[groupEntries[0]!.scenario]}
+          </h4>
           <ul>
             {groupEntries.map((entry) => (
-              <li key={entry.key}>
+              <li key={entry.id}>
                 <span>
                   {entry.label} · {BROKER_LABELS[entry.broker]}
                 </span>
                 <strong>
-                  {formatNumber(entry.throughput, 2)} msg/s
-                  {entry.p95Latency === null
+                  {formatNumber(entry.throughputMessagesPerSecond, 2)} msg/s
+                  {entry.p95LatencyMs === null
                     ? ''
-                    : ` · p95 ${formatNumber(entry.p95Latency, 2)} ms`}
+                    : ` · p95 ${formatNumber(entry.p95LatencyMs, 2)} ms`}
                 </strong>
               </li>
             ))}
@@ -476,14 +490,6 @@ function ManualComparison({
       ))}
     </section>
   );
-}
-
-function comparisonGroup(broker: string, scenario: string): string {
-  if (broker === 'redis' && scenario === 'fan-out')
-    return 'Ephemeral live baseline';
-  return scenario === 'fan-out'
-    ? 'Durable fan-out'
-    : 'Durable competing consumers';
 }
 
 function navigateHistory(event: KeyboardEvent<HTMLButtonElement>): void {

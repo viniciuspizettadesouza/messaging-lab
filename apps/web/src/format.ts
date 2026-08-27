@@ -1,5 +1,6 @@
 import type {
   BrokerId,
+  ComparisonTrackId,
   RunStatus,
   ScenarioId,
   SuiteStatus,
@@ -14,6 +15,12 @@ export const BROKER_LABELS: Record<BrokerId, string> = {
 export const SCENARIO_LABELS: Record<ScenarioId, string> = {
   'fan-out': 'Live fan-out',
   'competing-consumers': 'Competing consumers',
+};
+
+export const COMPARISON_TRACK_LABELS: Record<ComparisonTrackId, string> = {
+  primary: 'Primary Kafka–RabbitMQ track',
+  'adjacent-streaming': 'Adjacent Redis Streams track',
+  'ephemeral-baseline': 'Ephemeral Redis Pub/Sub baseline',
 };
 
 export const STATUS_LABELS: Record<RunStatus | SuiteStatus, string> = {

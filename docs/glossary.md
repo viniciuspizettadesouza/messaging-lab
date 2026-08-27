@@ -3,6 +3,21 @@
 Messaging Lab uses these terms narrowly so experiments with different delivery
 guarantees are not mistaken for interchangeable benchmarks.
 
+## Comparison taxonomy
+
+**Primary comparison track** is the Kafka-versus-RabbitMQ architectural
+trade-off, compared only inside the same fan-out or competing-consumer pattern.
+
+**Adjacent streaming track** contains Redis Streams. It is summarized
+independently because its stream and pending-entry mechanics differ from both
+current primary adapters.
+
+**Ephemeral baseline track** contains Redis Pub/Sub. Its measurements provide
+live-delivery context but never enter a durable-system winner or ranking.
+
+**Semantic contrast** is a manual selection spanning tracks. Values remain
+visible in separate groups, with no shared aggregate or conclusion.
+
 ## Delivery and durability
 
 **Ephemeral delivery** sends messages only to consumers that are connected at

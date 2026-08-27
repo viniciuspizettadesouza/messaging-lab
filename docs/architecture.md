@@ -75,6 +75,13 @@ The suite lifecycle hook reconnects to active-suite SSE after reload. Stable
 trials beneath their owning suite while preserving standalone runs. All JSON
 responses and suite events are runtime-validated with the shared schemas.
 
+Each hydrated run and suite trial is classified as `primary`,
+`adjacent-streaming`, or `ephemeral-baseline` from its broker and scenario.
+The identifier is emitted in shared contracts and CSV exports. Mixed suites
+remain valid scheduling containers, while summary counts and repeated-trial
+distributions remain partitioned by track. Legacy rows need no rewrite because
+classification is deterministic at hydration time.
+
 ## Run lifecycle
 
 ```mermaid
@@ -168,6 +175,14 @@ flowchart LR
 ```
 
 One consumer handles each message. Distribution depends on consumer readiness, broker scheduling, Kafka partition assignment, and acknowledgement timing; an even split is not guaranteed.
+
+In this adapter Kafka creates one partition per requested competing consumer,
+so conventional consumer-group parallelism is partition-bound. RabbitMQ uses
+one shared queue with explicit acknowledgements and configured prefetch. Redis
+Streams uses one consumer group whose pending entries represent delivered but
+unacknowledged work. These are broker-native demonstrations, not identical
+internal mechanisms. See
+[ADR 0001](adr/0001-semantic-comparison-tracks.md).
 
 ## Persistence model
 

@@ -6,7 +6,12 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { BrokerId, Run, ScenarioId } from '@messaging-lab/shared';
+import {
+  comparisonTrackFor,
+  type BrokerId,
+  type Run,
+  type ScenarioId,
+} from '@messaging-lab/shared';
 
 import { App } from './app.js';
 import type { DashboardApi } from './api/client.js';
@@ -67,18 +72,21 @@ describe('dashboard components', () => {
     const baseline = screen.getByLabelText('Ephemeral live baseline');
     expect(within(baseline).getByText('Redis Pub/Sub')).toBeInTheDocument();
     expect(
-      within(baseline).getByText(/excluded from the durable/),
+      within(baseline).getByText(/never participates/),
     ).toBeInTheDocument();
-    const fanOut = screen.getByLabelText('Durable fan-out comparison');
+    const fanOut = screen.getByLabelText('Primary fan-out comparison');
     expect(within(fanOut).getAllByText('Kafka')).toHaveLength(2);
     expect(within(fanOut).getAllByText('RabbitMQ')).toHaveLength(2);
     expect(within(fanOut).queryByText('Redis')).not.toBeInTheDocument();
     const competing = screen.getByLabelText(
-      'Durable competing-consumer comparison',
+      'Primary competing-consumer comparison',
     );
-    expect(within(competing).getAllByText('Redis')).toHaveLength(2);
+    expect(within(competing).queryByText('Redis')).not.toBeInTheDocument();
     expect(within(competing).getAllByText('Kafka')).toHaveLength(2);
     expect(within(competing).getAllByText('RabbitMQ')).toHaveLength(2);
+    const streams = screen.getByLabelText('Adjacent Redis Streams result');
+    expect(within(streams).getByText('Redis Streams')).toBeInTheDocument();
+    expect(within(streams).getByText(/not a ranking/)).toBeInTheDocument();
   });
 
   it('configures suite combinations, repetitions, order, and cooldown', async () => {
@@ -226,6 +234,7 @@ describe('dashboard components', () => {
         broker: 'kafka' as const,
         scenario: 'fan-out' as const,
       },
+      comparisonTrack: 'primary' as const,
     };
     const onFiltersChange = vi.fn();
     const onPageChange = vi.fn();
@@ -266,10 +275,18 @@ describe('dashboard components', () => {
     expect(screen.getByText('Standalone run')).toBeInTheDocument();
     expect(screen.getByText('Suite · 2 trials')).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Ephemeral live baseline' }),
+      screen.getByRole('heading', { name: 'Semantic contrasts' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/No shared winner/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', {
+        name: 'Ephemeral Redis Pub/Sub baseline · Live fan-out',
+      }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Durable fan-out' }),
+      screen.getByRole('heading', {
+        name: 'Primary Kafka–RabbitMQ track · Live fan-out',
+      }),
     ).toBeInTheDocument();
     await userEvent.selectOptions(
       screen.getByRole('combobox', { name: 'Broker' }),
@@ -330,5 +347,6 @@ function comparisonRun(
       broker,
       scenario,
     },
+    comparisonTrack: comparisonTrackFor(broker, scenario),
   };
 }

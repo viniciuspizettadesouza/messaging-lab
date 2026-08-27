@@ -95,6 +95,11 @@ describe('openDatabase', () => {
       count: 1,
     });
     expect(
+      new RunRepository(database).requireById(
+        '11111111-1111-4111-8111-111111111111',
+      ).comparisonTrack,
+    ).toBe('ephemeral-baseline');
+    expect(
       database
         .prepare(
           "SELECT COUNT(*) AS count FROM sqlite_master WHERE name = 'suites'",
@@ -137,9 +142,12 @@ describe('openDatabase', () => {
     migrateDatabase(database);
     const suites = new SuiteRepository(database, new RunRepository(database));
 
-    expect(
-      suites.requireById('22222222-2222-4222-8222-222222222222').environment,
-    ).toBeNull();
+    const legacySuite = suites.requireById(
+      '22222222-2222-4222-8222-222222222222',
+    );
+    expect(legacySuite.environment).toBeNull();
+    expect(legacySuite.comparisonTracks).toEqual(['primary']);
+    expect(legacySuite.runs[0]?.comparisonTrack).toBe('primary');
     database.close();
   });
 

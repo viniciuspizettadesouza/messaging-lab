@@ -269,6 +269,13 @@ describe('API', () => {
     expect(completed.summary).toMatchObject({
       completedRuns: 2,
       failedRuns: 0,
+      byTrack: expect.arrayContaining([
+        expect.objectContaining({ comparisonTrack: 'primary', totalRuns: 1 }),
+        expect.objectContaining({
+          comparisonTrack: 'adjacent-streaming',
+          totalRuns: 1,
+        }),
+      ]),
     });
 
     const listResponse = await application.app.inject({
@@ -315,6 +322,8 @@ describe('API', () => {
     expect(suiteResponseSchema.parse(jsonExport.json()).runs).toHaveLength(2);
     expect(csvExport.headers['content-type']).toContain('text/csv');
     expect(csvExport.body).toContain('throughput_messages_per_second');
+    expect(csvExport.body).toContain('comparison_track');
+    expect(csvExport.body).toContain('adjacent-streaming');
     expect(csvExport.body).toContain('environment_captured_at');
     expect(csvExport.body).toContain('redis:8.2.1-alpine3.22');
     expect(csvExport.body.split('\n')).toHaveLength(4);

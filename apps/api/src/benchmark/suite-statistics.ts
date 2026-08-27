@@ -1,4 +1,5 @@
-import type {
+import {
+  comparisonTrackFor,
   DistributionSummary,
   RunStatus,
   SuiteCombination,
@@ -33,6 +34,10 @@ export function summarizeSuiteCombinations(
     return {
       combinationIndex,
       combination,
+      comparisonTrack: comparisonTrackFor(
+        combination.broker,
+        combination.scenario,
+      ),
       totalTrials: trials.length,
       successfulTrials: successful.length,
       unsuccessfulTrials: trials.filter(

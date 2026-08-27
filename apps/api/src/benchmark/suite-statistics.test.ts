@@ -69,6 +69,7 @@ function trial(
     id: `11111111-1111-4111-8111-${String(position + 1).padStart(12, '0')}`,
     name: null,
     description: null,
+    comparisonTrack: 'primary',
     configuration: { ...BENCHMARK_DEFAULTS, ...combination },
     status,
     createdAt: timestamp,
@@ -98,6 +99,7 @@ function trial(
     combinationIndex: 0,
     repetition: position + 1,
     combination,
+    comparisonTrack: 'primary',
     run,
   };
 }

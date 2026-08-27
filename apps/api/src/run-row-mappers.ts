@@ -1,5 +1,6 @@
 import {
   runSchema,
+  comparisonTrackFor,
   type BrokerId,
   type Run,
   type RunConfiguration,
@@ -66,6 +67,7 @@ export function mapRunRows(
       consumerCount: row.consumer_count,
       timeoutMs: row.timeout_ms,
     },
+    comparisonTrack: comparisonTrackFor(row.broker, row.scenario),
     status: row.status,
     createdAt: row.created_at,
     startedAt: row.started_at,

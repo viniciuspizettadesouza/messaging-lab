@@ -18,6 +18,8 @@ import {
   type SuiteStatus,
   type BrokerId,
   type ScenarioId,
+  COMPARISON_TRACK_IDS,
+  comparisonTrackFor,
 } from '@messaging-lab/shared';
 
 import { RunRepository } from './run-repository.js';
@@ -370,6 +372,10 @@ export class SuiteRepository {
         combinationIndex: item.combination_index,
         repetition: item.repetition,
         combination: { broker: item.broker, scenario: item.scenario },
+        comparisonTrack: comparisonTrackFor(
+          item.broker as BrokerId,
+          item.scenario as ScenarioId,
+        ),
         run: item.run_id ? this.runs.requireById(item.run_id) : null,
       }),
     );
@@ -388,6 +394,27 @@ export class SuiteRepository {
     const completedRuns = suiteRuns.filter(
       (item) => item.run && TERMINAL_RUN_STATUSES.has(item.run.status),
     ).length;
+    const comparisonTracks = COMPARISON_TRACK_IDS.filter((track) =>
+      suiteRuns.some((item) => item.comparisonTrack === track),
+    );
+    const byTrack = comparisonTracks.map((comparisonTrack) => {
+      const trackRuns = suiteRuns.filter(
+        (item) => item.comparisonTrack === comparisonTrack,
+      );
+      const trackCount = (status: RunStatus) =>
+        trackRuns.filter((item) => (item.run?.status ?? 'pending') === status)
+          .length;
+      return {
+        comparisonTrack,
+        totalRuns: trackRuns.length,
+        pendingRuns: trackCount('pending'),
+        runningRuns: trackCount('running'),
+        completedRuns: trackCount('completed'),
+        failedRuns: trackCount('failed'),
+        timedOutRuns: trackCount('timed-out'),
+        cancelledRuns: trackCount('cancelled'),
+      };
+    });
 
     return suiteSchema.parse({
       id: row.id,
@@ -395,6 +422,7 @@ export class SuiteRepository {
       description: row.description,
       status: row.status,
       configuration,
+      comparisonTracks,
       progress: {
         completedRuns,
         totalRuns: suiteRuns.length,
@@ -411,6 +439,7 @@ export class SuiteRepository {
         failedRuns: counts.failed,
         timedOutRuns: counts['timed-out'],
         cancelledRuns: counts.cancelled,
+        byTrack,
       },
       combinationSummaries: summarizeSuiteCombinations(
         configuration.combinations,

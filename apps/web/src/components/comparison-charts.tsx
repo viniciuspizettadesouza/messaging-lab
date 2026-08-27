@@ -23,71 +23,107 @@ export function ComparisonCharts({ runs }: { readonly runs: Run[] }) {
     );
   }
 
-  const pubSub = groups.ephemeralLive[0];
-
   return (
     <>
       <section className="section-block" aria-labelledby="comparison-heading">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Comparable workloads</p>
-            <h2 id="comparison-heading">Durable performance comparisons</h2>
+            <p className="eyebrow">Primary comparison track</p>
+            <h2 id="comparison-heading">Kafka versus RabbitMQ</h2>
           </div>
           <p>
-            Latest result per broker and pattern. Delivery models remain
-            separated so unlike guarantees are not ranked together.
+            The lab's retained-log architecture and queue/exchange architecture,
+            shown only within matching workload patterns.
           </p>
         </div>
         <ComparisonGroup
-          label="Durable fan-out comparison"
-          title="Durable fan-out"
-          description="Kafka and RabbitMQ deliver to independent durable subscribers. Kafka supports retained-log replay; RabbitMQ does not."
-          runs={groups.durableFanOut}
+          label="Primary fan-out comparison"
+          title="Fan-out demonstrations"
+          description="Kafka uses one retained topic with independent consumer groups; RabbitMQ uses one exchange and an independent queue per subscriber."
+          runs={groups.primaryFanOut}
         />
         <ComparisonGroup
-          label="Durable competing-consumer comparison"
-          title="Durable competing consumers"
-          description="Redis Streams, Kafka, and RabbitMQ distribute acknowledged work. Replay and retention behavior still differ."
-          runs={groups.durableCompetingConsumers}
+          label="Primary competing-consumer comparison"
+          title="Competing-consumer demonstrations"
+          description="Kafka parallelism is bounded by topic partitions. RabbitMQ dispatches queue deliveries across consumers with explicit acknowledgements."
+          runs={groups.primaryCompetingConsumers}
+        />
+      </section>
+
+      <section className="section-block" aria-labelledby="streams-heading">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Adjacent streaming track</p>
+            <h2 id="streams-heading">Redis Streams</h2>
+          </div>
+          <p>
+            A retained-stream result with consumer-group pending-entry state,
+            reported independently from the primary architectural comparison.
+          </p>
+        </div>
+        <IndependentResult
+          label="Adjacent Redis Streams result"
+          kind="Independent stream summary"
+          title="Redis Streams"
+          description="An adjacent mechanism study, not a ranking against Kafka or RabbitMQ. The current adapters demonstrate different broker-native mechanisms."
+          run={groups.adjacentStreaming[0]}
         />
       </section>
 
       <section className="section-block" aria-labelledby="pubsub-heading">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Not a durable comparison</p>
+            <p className="eyebrow">Ephemeral baseline track</p>
             <h2 id="pubsub-heading">Redis Pub/Sub live baseline</h2>
           </div>
         </div>
-        <article className="baseline-card" aria-label="Ephemeral live baseline">
-          <div className="baseline-copy">
-            <span className="comparison-kind">Ephemeral delivery</span>
-            <h3>Redis Pub/Sub</h3>
-            <p>
-              Useful for live notifications, but it has no persistence,
-              acknowledgements, recovery, or replay. Its performance is shown as
-              context and excluded from the durable comparisons above.
-            </p>
-          </div>
-          {pubSub?.metrics ? (
-            <div className="baseline-metrics">
-              <ResultMetric
-                label="Throughput"
-                value={`${formatNumber(pubSub.metrics.throughputMessagesPerSecond, 2)} msg/s`}
-              />
-              <ResultMetric
-                label="p95 latency"
-                value={`${formatNumber(pubSub.metrics.latency.p95Ms, 2)} ms`}
-              />
-            </div>
-          ) : (
-            <span className="comparison-empty">
-              No Redis Pub/Sub result yet
-            </span>
-          )}
-        </article>
+        <IndependentResult
+          label="Ephemeral live baseline"
+          kind="Ephemeral delivery"
+          title="Redis Pub/Sub"
+          description="Useful for live notifications, but it has no persistence, acknowledgements, recovery, or replay. It is context only and never participates in durable-system rankings."
+          run={groups.ephemeralBaseline[0]}
+        />
       </section>
     </>
+  );
+}
+
+function IndependentResult({
+  label,
+  kind,
+  title,
+  description,
+  run,
+}: {
+  readonly label: string;
+  readonly kind: string;
+  readonly title: string;
+  readonly description: string;
+  readonly run: Run | undefined;
+}) {
+  return (
+    <article className="baseline-card" aria-label={label}>
+      <div className="baseline-copy">
+        <span className="comparison-kind">{kind}</span>
+        <h3>{title}</h3>
+        <p>{description}</p>
+      </div>
+      {run?.metrics ? (
+        <div className="baseline-metrics">
+          <ResultMetric
+            label="Throughput"
+            value={`${formatNumber(run.metrics.throughputMessagesPerSecond, 2)} msg/s`}
+          />
+          <ResultMetric
+            label="p95 latency"
+            value={`${formatNumber(run.metrics.latency.p95Ms, 2)} ms`}
+          />
+        </div>
+      ) : (
+        <span className="comparison-empty">No {title} result yet</span>
+      )}
+    </article>
   );
 }
 
@@ -106,7 +142,7 @@ function ComparisonGroup({
     <article className="comparison-group" aria-label={label}>
       <div className="comparison-group-heading">
         <div>
-          <span className="comparison-kind">Comparable workload</span>
+          <span className="comparison-kind">Primary track</span>
           <h3>{title}</h3>
         </div>
         <p>{description}</p>
@@ -134,21 +170,19 @@ function ComparisonGroup({
   );
 }
 
-interface BarChartProps {
-  readonly title: string;
-  readonly unit: string;
-  readonly runs: Run[];
-  readonly value: (run: Run) => number;
-  readonly lowerIsBetter?: boolean;
-}
-
 function BarChart({
   title,
   unit,
   runs,
   value,
   lowerIsBetter = false,
-}: BarChartProps) {
+}: {
+  readonly title: string;
+  readonly unit: string;
+  readonly runs: Run[];
+  readonly value: (run: Run) => number;
+  readonly lowerIsBetter?: boolean;
+}) {
   const maximum = Math.max(...runs.map(value), 1);
   return (
     <figure className="bar-chart" aria-label={`${title} comparison chart`}>

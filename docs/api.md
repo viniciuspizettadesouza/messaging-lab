@@ -37,6 +37,9 @@ Only `broker` and `scenario` are required; omitted numeric values receive the do
 ### `GET /api/runs`
 
 Returns newest-first run history with full configuration, status, aggregate metrics, notes, and errors.
+Every run includes `comparisonTrack`: `primary`, `adjacent-streaming`, or
+`ephemeral-baseline`. Legacy rows are classified from broker and scenario when
+read.
 
 | Query parameter | Default | Constraints                                                              |
 | --------------- | ------: | ------------------------------------------------------------------------ |
@@ -101,7 +104,7 @@ benchmark lane until it completes or is cancelled, including cooldown periods.
 
 ```json
 {
-  "name": "Durable messaging comparison",
+  "name": "Mixed-track scheduling suite",
   "workload": {
     "messageCount": 10000,
     "payloadSizeBytes": 1024,
@@ -127,6 +130,9 @@ runs. Supported order strategies are `fixed`, `rotating`, and `randomized`.
 Randomized order is generated once and persisted with the suite.
 An optional description of at most 500 characters can accompany the required
 suite name.
+The example deliberately mixes the adjacent Redis Streams track with the
+primary Kafka–RabbitMQ track. It shares scheduling inputs and execution order,
+not aggregate statistics or a combined conclusion.
 
 ### `GET /api/suites`
 
@@ -144,6 +150,9 @@ null `run`; started trials embed their persisted run. `combinationSummaries`
 contains success/failure counts, five-number throughput and p50/p95/p99 latency
 distributions, IQR, and aggregate delivery anomalies for each configured
 broker/scenario combination.
+Each trial and combination summary includes `comparisonTrack`; the suite lists
+its `comparisonTracks`, and `summary.byTrack` reports lifecycle counts without
+combining tracks.
 
 The response also includes an immutable `environment` snapshot captured when
 the suite is created. It records the application version and optional commit,
@@ -157,6 +166,7 @@ Downloads the suite and all underlying trials. JSON uses the same validated
 suite contract as the detail endpoint. CSV emits one row per ordered trial,
 including queued and unsuccessful trials, configuration identity, lifecycle
 timestamps, metrics, anomaly counts, errors, and environment provenance.
+The `comparison_track` CSV column makes semantic boundaries explicit.
 
 ### `POST /api/suites/:id/cancel`
 

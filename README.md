@@ -8,7 +8,8 @@ This project is an educational lab, not a universal broker ranking. Results desc
 
 ## What you can explore
 
-- Compare durable fan-out and competing-consumer workloads in separate result groups; Redis Pub/Sub is shown only as an ephemeral live-delivery baseline.
+- Compare Kafka and RabbitMQ as the primary architectural trade-off, within matching scenarios.
+- Inspect Redis Streams in an adjacent streaming track and Redis Pub/Sub only as an ephemeral baseline.
 
 - Run live fan-out and competing-consumer experiments against three real brokers.
 - Build persistent suites from selected broker/pattern combinations.
@@ -92,6 +93,12 @@ More detail and messaging-flow diagrams are in [architecture](docs/architecture.
 
 ## Broker comparison
 
+The dashboard uses three explicit tracks. `primary` contains only Kafka and
+RabbitMQ. `adjacent-streaming` contains Redis Streams. `ephemeral-baseline`
+contains Redis Pub/Sub and is never included in a durable-system ranking.
+Mixed suites may schedule all three, but statistics and conclusions remain
+separated. See [ADR 0001](docs/adr/0001-semantic-comparison-tracks.md).
+
 | Broker and pattern                | Persistence | Acknowledgements | Recovery | Replay | Implementation                                |
 | --------------------------------- | :---------: | :--------------: | :------: | :----: | --------------------------------------------- |
 | Redis Pub/Sub fan-out             |     No      |        No        |    No    |   No   | Live subscribers receive each publication     |
@@ -135,6 +142,7 @@ The Docker-backed commands require a running Docker daemon. The smoke test uses 
 - [Architecture and messaging flows](docs/architecture.md)
 - [Benchmark methodology and interpretation](docs/benchmark-methodology.md)
 - [Messaging glossary](docs/glossary.md)
+- [Semantic comparison tracks ADR](docs/adr/0001-semantic-comparison-tracks.md)
 - [HTTP API and environment variables](docs/api.md)
 
 ## License

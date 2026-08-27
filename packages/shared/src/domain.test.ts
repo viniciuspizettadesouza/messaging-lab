@@ -8,6 +8,7 @@ import {
   scenarioIdSchema,
   suiteOrderStrategySchema,
   suiteStatusSchema,
+  comparisonTrackFor,
 } from './domain.js';
 
 const validMetrics = {
@@ -41,6 +42,17 @@ describe('domain identifier schemas', () => {
     expect(runStatusSchema.safeParse('stopped').success).toBe(false);
     expect(suiteStatusSchema.safeParse('timed-out').success).toBe(false);
     expect(suiteOrderStrategySchema.safeParse('shuffled').success).toBe(false);
+  });
+
+  it('classifies every broker-native mechanism deterministically', () => {
+    expect(comparisonTrackFor('kafka', 'fan-out')).toBe('primary');
+    expect(comparisonTrackFor('rabbitmq', 'competing-consumers')).toBe(
+      'primary',
+    );
+    expect(comparisonTrackFor('redis', 'competing-consumers')).toBe(
+      'adjacent-streaming',
+    );
+    expect(comparisonTrackFor('redis', 'fan-out')).toBe('ephemeral-baseline');
   });
 });
 

@@ -1,26 +1,19 @@
-import type { BrokerId, Run, ScenarioId } from '@messaging-lab/shared';
-
-export type ComparisonGroupId =
-  | 'ephemeral-live'
-  | 'durable-fan-out'
-  | 'durable-competing-consumers';
+import type {
+  BrokerId,
+  ComparisonTrackId,
+  Run,
+  ScenarioId,
+} from '@messaging-lab/shared';
 
 export interface ComparisonGroups {
-  readonly ephemeralLive: Run[];
-  readonly durableFanOut: Run[];
-  readonly durableCompetingConsumers: Run[];
+  readonly primaryFanOut: Run[];
+  readonly primaryCompetingConsumers: Run[];
+  readonly adjacentStreaming: Run[];
+  readonly ephemeralBaseline: Run[];
 }
 
-export function comparisonGroupFor(run: Run): ComparisonGroupId {
-  if (
-    run.configuration.broker === 'redis' &&
-    run.configuration.scenario === 'fan-out'
-  ) {
-    return 'ephemeral-live';
-  }
-  return run.configuration.scenario === 'fan-out'
-    ? 'durable-fan-out'
-    : 'durable-competing-consumers';
+export function comparisonGroupFor(run: Run): ComparisonTrackId {
+  return run.comparisonTrack;
 }
 
 export function latestCompletedRuns(runs: readonly Run[]): Map<string, Run> {
@@ -41,16 +34,18 @@ export function latestCompletedRuns(runs: readonly Run[]): Map<string, Run> {
 export function selectComparisonGroups(runs: readonly Run[]): ComparisonGroups {
   const latest = latestCompletedRuns(runs);
   return {
-    ephemeralLive: compact([latest.get(runKey('redis', 'fan-out'))]),
-    durableFanOut: compact([
+    primaryFanOut: compact([
       latest.get(runKey('kafka', 'fan-out')),
       latest.get(runKey('rabbitmq', 'fan-out')),
     ]),
-    durableCompetingConsumers: compact([
-      latest.get(runKey('redis', 'competing-consumers')),
+    primaryCompetingConsumers: compact([
       latest.get(runKey('kafka', 'competing-consumers')),
       latest.get(runKey('rabbitmq', 'competing-consumers')),
     ]),
+    adjacentStreaming: compact([
+      latest.get(runKey('redis', 'competing-consumers')),
+    ]),
+    ephemeralBaseline: compact([latest.get(runKey('redis', 'fan-out'))]),
   };
 }
 

@@ -101,19 +101,19 @@ The completed baseline records what was built under the original three-system co
 
 ## 16. Semantic comparison realignment
 
-- [ ] Add an ADR defining the primary Kafka-versus-RabbitMQ architectural trade-off comparison, the adjacent Redis Streams track, the Redis Pub/Sub baseline, and broker-native demonstrations.
-- [ ] Document the official-source evidence for retained logs, queue consumption, routing, acknowledgements, replay, consumer groups, and ephemeral delivery.
-- [ ] Add an explicit comparison-track identifier to shared suite, summary, selection, and export contracts without invalidating existing persisted runs.
-- [ ] Classify existing runs deterministically from broker and scenario when reading legacy data.
-- [ ] Make Kafka and RabbitMQ the only participants in default primary-comparison charts and summaries.
-- [ ] Move Redis Streams results into a separate adjacent-streaming panel with independent summaries and explanatory copy.
-- [ ] Keep Redis Pub/Sub in a separate ephemeral-baseline panel and prohibit durable-system rankings against it.
-- [ ] Allow mixed-track suites as scheduling containers while keeping their aggregates, charts, and conclusions separated by track.
-- [ ] Relabel cross-track manual selections as semantic contrasts and remove shared winners, rankings, and combined aggregates.
-- [ ] Explain partition-bound Kafka parallelism, RabbitMQ queue/exchange topology, Redis Streams pending-entry state, and the limits of identical workload inputs.
-- [ ] Update README, methodology, architecture, API examples, glossary, and dashboard copy to use the same taxonomy.
-- [ ] Add selector, contract, migration-compatibility, API, and UI tests for every track boundary.
-- [ ] Evaluate a future RabbitMQ Streams adapter as the prerequisite for a mechanism-level retained-stream comparison with Kafka.
+- [x] Add an ADR defining the primary Kafka-versus-RabbitMQ architectural trade-off comparison, the adjacent Redis Streams track, the Redis Pub/Sub baseline, and broker-native demonstrations.
+- [x] Document the official-source evidence for retained logs, queue consumption, routing, acknowledgements, replay, consumer groups, and ephemeral delivery.
+- [x] Add an explicit comparison-track identifier to shared suite, summary, selection, and export contracts without invalidating existing persisted runs.
+- [x] Classify existing runs deterministically from broker and scenario when reading legacy data.
+- [x] Make Kafka and RabbitMQ the only participants in default primary-comparison charts and summaries.
+- [x] Move Redis Streams results into a separate adjacent-streaming panel with independent summaries and explanatory copy.
+- [x] Keep Redis Pub/Sub in a separate ephemeral-baseline panel and prohibit durable-system rankings against it.
+- [x] Allow mixed-track suites as scheduling containers while keeping their aggregates, charts, and conclusions separated by track.
+- [x] Relabel cross-track manual selections as semantic contrasts and remove shared winners, rankings, and combined aggregates.
+- [x] Explain partition-bound Kafka parallelism, RabbitMQ queue/exchange topology, Redis Streams pending-entry state, and the limits of identical workload inputs.
+- [x] Update README, methodology, architecture, API examples, glossary, and dashboard copy to use the same taxonomy.
+- [x] Add selector, contract, migration-compatibility, API, and UI tests for every track boundary.
+- [x] Evaluate a future RabbitMQ Streams adapter as the prerequisite for a mechanism-level retained-stream comparison with Kafka.
 
 ## 17. Parameter sweep experiments
 
