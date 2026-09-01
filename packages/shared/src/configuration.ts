@@ -11,6 +11,7 @@ export const BENCHMARK_LIMITS = {
   payloadSizeBytes: { min: 1, max: 1_048_576, default: 1_024 },
   producerConcurrency: { min: 1, max: 32, default: 1 },
   consumerCount: { min: 1, max: 64, default: 1 },
+  consumerDelayMs: { min: 0, max: 10_000, default: 0 },
   timeoutMs: { min: 1_000, max: 600_000, default: 120_000 },
 } as const;
 
@@ -19,6 +20,7 @@ export const BENCHMARK_DEFAULTS = {
   payloadSizeBytes: BENCHMARK_LIMITS.payloadSizeBytes.default,
   producerConcurrency: BENCHMARK_LIMITS.producerConcurrency.default,
   consumerCount: BENCHMARK_LIMITS.consumerCount.default,
+  consumerDelayMs: BENCHMARK_LIMITS.consumerDelayMs.default,
   timeoutMs: BENCHMARK_LIMITS.timeoutMs.default,
 } as const;
 
@@ -35,6 +37,7 @@ export const SWEEP_PARAMETERS = [
   'producerConcurrency',
   'payloadSizeBytes',
   'messageCount',
+  'consumerDelayMs',
 ] as const;
 export const EXPERIMENT_DESCRIPTION_MAX_LENGTH = 500;
 
@@ -54,6 +57,9 @@ const configurationFields = {
   payloadSizeBytes: boundedInteger(BENCHMARK_LIMITS.payloadSizeBytes),
   producerConcurrency: boundedInteger(BENCHMARK_LIMITS.producerConcurrency),
   consumerCount: boundedInteger(BENCHMARK_LIMITS.consumerCount),
+  consumerDelayMs: boundedInteger(BENCHMARK_LIMITS.consumerDelayMs).default(
+    BENCHMARK_DEFAULTS.consumerDelayMs,
+  ),
   timeoutMs: boundedInteger(BENCHMARK_LIMITS.timeoutMs),
 };
 
@@ -62,6 +68,7 @@ const workloadConfigurationFields = {
   payloadSizeBytes: configurationFields.payloadSizeBytes,
   producerConcurrency: configurationFields.producerConcurrency,
   consumerCount: configurationFields.consumerCount,
+  consumerDelayMs: configurationFields.consumerDelayMs,
   timeoutMs: configurationFields.timeoutMs,
 };
 
@@ -184,6 +191,9 @@ const workloadRequestSchema = z
     consumerCount: workloadConfigurationFields.consumerCount.default(
       BENCHMARK_DEFAULTS.consumerCount,
     ),
+    consumerDelayMs: workloadConfigurationFields.consumerDelayMs.default(
+      BENCHMARK_DEFAULTS.consumerDelayMs,
+    ),
     timeoutMs: workloadConfigurationFields.timeoutMs.default(
       BENCHMARK_DEFAULTS.timeoutMs,
     ),
@@ -214,17 +224,8 @@ export const createSuiteRequestSchema = z
   .transform(({ name, description, ...configuration }) => ({
     name,
     description,
-    configuration,
-  }))
-  .pipe(
-    z
-      .object({
-        name: z.string(),
-        description: z.string().nullable(),
-        configuration: suiteConfigurationSchema,
-      })
-      .strict(),
-  );
+    configuration: suiteConfigurationSchema.parse(configuration),
+  }));
 
 export const startRunRequestSchema = z
   .object({
@@ -243,6 +244,9 @@ export const startRunRequestSchema = z
     ),
     consumerCount: configurationFields.consumerCount.default(
       BENCHMARK_DEFAULTS.consumerCount,
+    ),
+    consumerDelayMs: configurationFields.consumerDelayMs.default(
+      BENCHMARK_DEFAULTS.consumerDelayMs,
     ),
     timeoutMs: configurationFields.timeoutMs.default(
       BENCHMARK_DEFAULTS.timeoutMs,

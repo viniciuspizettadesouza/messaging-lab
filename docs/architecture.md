@@ -176,6 +176,21 @@ flowchart LR
 
 One consumer handles each message. Distribution depends on consumer readiness, broker scheduling, Kafka partition assignment, and acknowledgement timing; an even split is not guaranteed.
 
+## Ordering and slow-consumer instrumentation
+
+The benchmark wire envelope includes a global sequence plus producer identity,
+producer-local sequence, and ordering key. Adapters attach a native ordering
+scope on delivery: Kafka consumer-group partition, RabbitMQ queue, or Redis stream. The engine
+keeps global and native-scope violation counters separate because those scopes
+are not interchangeable. Redis Pub/Sub has no retained native ordering scope
+in the current lab.
+
+An optional consumer delay is applied before a measured delivery is recorded
+and acknowledged. The engine records the maximum and final number of expected
+published deliveries not yet observed by the application. This is explicitly
+an application-boundary backlog observation, not a shared interpretation of
+Kafka lag, RabbitMQ queue depth, and Redis pending entries.
+
 In this adapter Kafka creates one partition per requested competing consumer,
 so conventional consumer-group parallelism is partition-bound. RabbitMQ uses
 one shared queue with explicit acknowledgements and configured prefetch. Redis

@@ -17,6 +17,7 @@ export interface RunRow {
   payload_size_bytes: number;
   producer_concurrency: number;
   consumer_count: number;
+  consumer_delay_ms: number;
   timeout_ms: number;
   status: RunStatus;
   created_at: string;
@@ -35,6 +36,10 @@ export interface MetricsRow {
   lost_messages: number;
   duplicate_messages: number;
   error_count: number;
+  global_ordering_violations: number;
+  native_scope_ordering_violations: number;
+  maximum_observed_backlog: number;
+  final_observed_backlog: number;
 }
 
 export interface NoteRow {
@@ -65,6 +70,7 @@ export function mapRunRows(
       payloadSizeBytes: row.payload_size_bytes,
       producerConcurrency: row.producer_concurrency,
       consumerCount: row.consumer_count,
+      consumerDelayMs: row.consumer_delay_ms,
       timeoutMs: row.timeout_ms,
     },
     comparisonTrack: comparisonTrackFor(row.broker, row.scenario),
@@ -87,6 +93,14 @@ export function mapRunRows(
           lostMessages: metricsRow.lost_messages,
           duplicateMessages: metricsRow.duplicate_messages,
           errorCount: metricsRow.error_count,
+          ordering: {
+            globalViolations: metricsRow.global_ordering_violations,
+            nativeScopeViolations: metricsRow.native_scope_ordering_violations,
+          },
+          backlog: {
+            maximumObservedMessages: metricsRow.maximum_observed_backlog,
+            finalObservedMessages: metricsRow.final_observed_backlog,
+          },
         }
       : null,
     notes: noteRows.map(({ note }) => note),

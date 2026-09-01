@@ -127,7 +127,8 @@ class RabbitMqRun implements BrokerRunResource {
       if (!this.queues.includes(queue)) this.queues.push(queue);
       const result = await this.channel.consume(
         queue,
-        (message) => this.handleDelivery(message, consumerId, onDelivery),
+        (message) =>
+          this.handleDelivery(message, consumerId, queue, onDelivery),
         { noAck: false },
       );
       this.consumerTags.push(result.consumerTag);
@@ -190,7 +191,11 @@ class RabbitMqRun implements BrokerRunResource {
       const recovered = await waitForMessage(this.channel, queue);
       if (!recovered) throw new Error('RabbitMQ did not requeue the message.');
       await onDelivery(
-        decodeMessage(recovered.content, 'rabbitmq-recovered-consumer'),
+        decodeMessage(
+          recovered.content,
+          'rabbitmq-recovered-consumer',
+          `queue:${queue}`,
+        ),
       );
       this.channel.ack(recovered);
     } finally {
@@ -242,11 +247,14 @@ class RabbitMqRun implements BrokerRunResource {
   private handleDelivery(
     message: ConsumeMessage | null,
     consumerId: string,
+    queue: string,
     onDelivery: DeliveryHandler,
   ): void {
     if (!message) return;
 
-    void Promise.resolve(onDelivery(decodeMessage(message.content, consumerId)))
+    void Promise.resolve(
+      onDelivery(decodeMessage(message.content, consumerId, `queue:${queue}`)),
+    )
       .then(() => this.channel.ack(message))
       .catch((error: unknown) => {
         this.backgroundErrors.push(asError(error));

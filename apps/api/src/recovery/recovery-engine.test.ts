@@ -130,27 +130,48 @@ class RecoveryFakeAdapter implements BrokerAdapter {
         handler = nextHandler;
         if (context.scenario !== 'fan-out') {
           for (const item of published) {
-            await handler({ ...item, consumerId: 'fake-consumer' });
+            await handler({
+              ...item,
+              consumerId: 'fake-consumer',
+              nativeOrderScope: 'fake:scope',
+            });
           }
         }
       },
       publish: async (item) => {
         published.push(item);
-        if (handler) await handler({ ...item, consumerId: 'fake-consumer' });
+        if (handler)
+          await handler({
+            ...item,
+            consumerId: 'fake-consumer',
+            nativeOrderScope: 'fake:scope',
+          });
       },
       replay: async (onDelivery) => {
         if (this.failReplay) throw new Error('replay failed');
         for (const item of published) {
-          await onDelivery({ ...item, consumerId: 'fake-replay' });
+          await onDelivery({
+            ...item,
+            consumerId: 'fake-replay',
+            nativeOrderScope: 'fake:scope',
+          });
         }
       },
       resetReplay: async (onDelivery) => {
         for (const item of published) {
-          await onDelivery({ ...item, consumerId: 'fake-offset-reset' });
+          await onDelivery({
+            ...item,
+            consumerId: 'fake-offset-reset',
+            nativeOrderScope: 'fake:scope',
+          });
         }
       },
       demonstrateRecovery: async (item, onDelivery) => {
-        await onDelivery({ ...item, consumerId: 'fake-recovered' });
+        await onDelivery({
+          ...item,
+          consumerId: 'fake-recovered',
+          nativeOrderScope: 'fake:scope',
+        });
       },
       cleanup: async () => {
         this.cleanupCalls += 1;

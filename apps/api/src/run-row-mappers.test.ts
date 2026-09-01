@@ -14,6 +14,7 @@ const row: RunRow = {
   payload_size_bytes: BENCHMARK_DEFAULTS.payloadSizeBytes,
   producer_concurrency: BENCHMARK_DEFAULTS.producerConcurrency,
   consumer_count: BENCHMARK_DEFAULTS.consumerCount,
+  consumer_delay_ms: BENCHMARK_DEFAULTS.consumerDelayMs,
   timeout_ms: BENCHMARK_DEFAULTS.timeoutMs,
   status: 'failed',
   created_at: '2026-08-18T12:00:00.000Z',

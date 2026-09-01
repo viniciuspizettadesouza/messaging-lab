@@ -3,12 +3,18 @@ import type { BrokerCapabilities, BrokerId, ScenarioId } from './domain.js';
 
 export interface OutboundMessage {
   readonly id: string;
+  readonly globalSequence: number;
+  readonly producerId: string;
+  readonly producerSequence: number;
+  readonly orderingKey: string;
   readonly payload: Uint8Array;
   readonly publishedAtNanoseconds: bigint;
 }
 
 export interface BrokerDelivery extends OutboundMessage {
   readonly consumerId: string;
+  /** Broker-native scope in which delivery order has a defined meaning. */
+  readonly nativeOrderScope: string | null;
 }
 
 export type DeliveryHandler = (

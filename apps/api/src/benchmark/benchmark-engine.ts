@@ -52,6 +52,7 @@ export class BenchmarkEngine {
       warmupMessages * expectedMultiplier,
       configuration.messageCount * expectedMultiplier,
       configuration.scenario === 'fan-out',
+      expectedMultiplier,
       this.latencySampleCapacity,
       options.onProgress,
     );
@@ -77,7 +78,15 @@ export class BenchmarkEngine {
       });
       resource = await raceWithSignal(creation, signal);
       await raceWithSignal(
-        resource.startConsumers((delivery) => tracker.add(delivery)),
+        resource.startConsumers(async (delivery) => {
+          if (
+            configuration.consumerDelayMs > 0 &&
+            delivery.id.startsWith('message-')
+          ) {
+            await delay(configuration.consumerDelayMs, signal);
+          }
+          tracker.add(delivery);
+        }),
         signal,
       );
       options.onProgress?.({
@@ -100,6 +109,10 @@ export class BenchmarkEngine {
         await raceWithSignal(
           resource.publish({
             id: `warmup-${index}`,
+            globalSequence: index,
+            producerId: 'warmup-producer',
+            producerSequence: index,
+            orderingKey: 'warmup',
             payload: createDeterministicPayload(
               configuration.payloadSizeBytes,
               index,
@@ -122,17 +135,26 @@ export class BenchmarkEngine {
       const startedAt = process.hrtime.bigint();
       let nextMessage = 0;
       let publishedMessages = 0;
+      let submittedMessages = 0;
       const workers = Array.from(
         { length: configuration.producerConcurrency },
-        async () => {
+        async (_, producerIndex) => {
+          const producerId = `producer-${producerIndex + 1}`;
+          let producerSequence = 0;
           while (true) {
             const index = nextMessage;
             nextMessage += 1;
             if (index >= configuration.messageCount) return;
             throwIfAborted(signal);
+            submittedMessages += 1;
+            tracker.setSubmittedMessages(submittedMessages);
             await raceWithSignal(
               resource!.publish({
                 id: `message-${index}`,
+                globalSequence: index,
+                producerId,
+                producerSequence,
+                orderingKey: producerId,
                 payload: createDeterministicPayload(
                   configuration.payloadSizeBytes,
                   index,
@@ -141,8 +163,8 @@ export class BenchmarkEngine {
               }),
               signal,
             );
+            producerSequence += 1;
             publishedMessages += 1;
-            tracker.setPublishedMessages(publishedMessages);
             options.onProgress?.({
               phase: 'publishing',
               completedUnits: publishedMessages,
@@ -171,6 +193,10 @@ export class BenchmarkEngine {
         uniqueDeliveries: tracker.uniqueDeliveries,
         duplicateDeliveries: tracker.duplicateDeliveries,
         latency: tracker.latency,
+        globalOrderingViolations: tracker.globalOrderingViolations,
+        nativeScopeOrderingViolations: tracker.nativeScopeOrderingViolations,
+        maximumObservedBacklog: tracker.maximumObservedBacklog,
+        finalObservedBacklog: tracker.currentObservedBacklog,
       });
     } catch (error) {
       executionError = error;
@@ -226,12 +252,18 @@ class DeliveryTracker {
   private measuring = false;
   private received = 0;
   private duplicates = 0;
-  private published = 0;
+  private submitted = 0;
+  private globalViolations = 0;
+  private nativeViolations = 0;
+  private maximumBacklog = 0;
+  private readonly lastGlobalSequence = new Map<string, number>();
+  private readonly lastNativeSequence = new Map<string, number>();
 
   public constructor(
     private readonly expectedWarmupDeliveries: number,
     public readonly expectedDeliveries: number,
     private readonly fanOut: boolean,
+    private readonly deliveryMultiplier: number,
     sampleCapacity: number,
     private readonly onProgress?: (progress: BenchmarkProgress) => void,
   ) {
@@ -261,7 +293,10 @@ class DeliveryTracker {
     if (!delivery.id.startsWith('message-')) return;
     this.received += 1;
     if (this.deliveryKeys.has(key)) this.duplicates += 1;
-    else this.deliveryKeys.add(key);
+    else {
+      this.deliveryKeys.add(key);
+      this.observeOrdering(delivery);
+    }
     const latencyMs =
       Number(process.hrtime.bigint() - delivery.publishedAtNanoseconds) /
       1_000_000;
@@ -270,7 +305,7 @@ class DeliveryTracker {
       phase: 'consuming',
       completedUnits: this.deliveryKeys.size,
       totalUnits: this.expectedDeliveries,
-      publishedMessages: this.published,
+      publishedMessages: this.submitted,
       receivedMessages: this.received,
     });
 
@@ -283,8 +318,12 @@ class DeliveryTracker {
     this.measuring = true;
   }
 
-  public setPublishedMessages(publishedMessages: number): void {
-    this.published = publishedMessages;
+  public setSubmittedMessages(submittedMessages: number): void {
+    this.submitted = submittedMessages;
+    this.maximumBacklog = Math.max(
+      this.maximumBacklog,
+      this.currentObservedBacklog,
+    );
   }
 
   public async waitForWarmup(signal: AbortSignal): Promise<void> {
@@ -310,6 +349,70 @@ class DeliveryTracker {
   public get latency(): BenchmarkMetrics['latency'] {
     return this.sampler.percentiles();
   }
+
+  public get globalOrderingViolations(): number {
+    return this.globalViolations;
+  }
+
+  public get nativeScopeOrderingViolations(): number {
+    return this.nativeViolations;
+  }
+
+  public get maximumObservedBacklog(): number {
+    return this.maximumBacklog;
+  }
+
+  public get currentObservedBacklog(): number {
+    const expectedPublishedDeliveries = Math.min(
+      this.expectedDeliveries,
+      this.submitted * this.deliveryMultiplier,
+    );
+    return Math.max(0, expectedPublishedDeliveries - this.deliveryKeys.size);
+  }
+
+  private observeOrdering(delivery: BrokerDelivery): void {
+    const globalScope = this.fanOut ? delivery.consumerId : 'all-consumers';
+    const previousGlobal = this.lastGlobalSequence.get(globalScope);
+    if (
+      previousGlobal !== undefined &&
+      delivery.globalSequence < previousGlobal
+    ) {
+      this.globalViolations += 1;
+    }
+    this.lastGlobalSequence.set(
+      globalScope,
+      Math.max(previousGlobal ?? -1, delivery.globalSequence),
+    );
+
+    if (delivery.nativeOrderScope === null) return;
+    const nativeKey = `${delivery.nativeOrderScope}:${delivery.producerId}:${delivery.orderingKey}`;
+    const previousNative = this.lastNativeSequence.get(nativeKey);
+    if (
+      previousNative !== undefined &&
+      delivery.producerSequence < previousNative
+    ) {
+      this.nativeViolations += 1;
+    }
+    this.lastNativeSequence.set(
+      nativeKey,
+      Math.max(previousNative ?? -1, delivery.producerSequence),
+    );
+  }
+}
+
+async function delay(milliseconds: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) throw signal.reason ?? new Error('Benchmark aborted.');
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, milliseconds);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal.reason ?? new Error('Benchmark aborted.'));
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 function throwIfAborted(signal: AbortSignal): void {

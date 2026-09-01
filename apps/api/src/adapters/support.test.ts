@@ -7,6 +7,10 @@ describe('broker adapter support', () => {
   it('round-trips the broker message envelope without losing binary data', () => {
     const message = {
       id: 'message-1',
+      globalSequence: 1,
+      producerId: 'producer-1',
+      producerSequence: 1,
+      orderingKey: 'producer-1',
       payload: Uint8Array.from([0, 1, 2, 255]),
       publishedAtNanoseconds: 123_456_789n,
     };
@@ -15,6 +19,7 @@ describe('broker adapter support', () => {
       ...message,
       payload: Buffer.from(message.payload),
       consumerId: 'consumer-1',
+      nativeOrderScope: null,
     });
   });
 

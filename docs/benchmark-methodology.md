@@ -23,6 +23,7 @@ Provisioning, warm-up, and cleanup are outside the measured interval. The timed 
 | `payloadSizeBytes`    |   1,024 |       1 | 1,048,576 | Deterministic payload size                    |
 | `producerConcurrency` |       1 |       1 |        32 | Concurrent publishing workers                 |
 | `consumerCount`       |       1 |       1 |        64 | Subscribers or competing consumers            |
+| `consumerDelayMs`     |       0 |       0 |    10,000 | Artificial processing delay per delivery      |
 | `timeoutMs`           | 120,000 |   1,000 |   600,000 | Maximum run time, including setup and cleanup |
 
 Payload byte `i` is deterministically generated from the message seed and position. This avoids random-generation cost and makes payload construction consistent across runs.
@@ -46,6 +47,9 @@ For fan-out, uniqueness is keyed by message and consumer. For competing consumer
 | Lost messages           | Expected unique deliveries minus observed unique deliveries, never below 0 |
 | Duplicate messages      | Deliveries whose scenario-specific uniqueness key was already observed     |
 | Errors                  | Aggregate run errors                                                       |
+| Global order violations | Deliveries observed below the greatest prior global sequence in that path  |
+| Native-scope violations | Per-producer/key regressions inside a partition, queue, or Redis stream    |
+| Observed backlog        | Published expected deliveries not yet observed by the application          |
 
 Latency timestamps use `process.hrtime.bigint()` in the same API host process before publication and after delivery. Wall-clock changes therefore do not affect latency.
 
@@ -83,7 +87,7 @@ track headings. No cross-track median, winner, or aggregate is calculated.
 ## Parameter sweeps
 
 A suite may vary exactly one workload dimension: consumer count, producer
-count, payload size, or message count. Sweep values must be unique, strictly
+count, payload size, message count, or artificial consumer delay. Sweep values must be unique, strictly
 increasing integers inside the normal benchmark limits. Every selected
 broker/scenario combination runs at every value for every repetition; the
 expanded suite remains subject to the 100-run maximum. The base workload is
@@ -96,6 +100,34 @@ latency can suggest contention; neither establishes a broker-wide limit. These
 curves describe this local host, broker images, adapter configuration, Docker
 resources, and background load. Confirm apparent knees with repeated runs and
 controlled environments before drawing conclusions.
+
+## Ordering and backpressure
+
+Every measured message carries a global sequence, producer identity,
+producer-local sequence, and stable ordering key. Global violations are
+counted separately from regressions inside a broker-native ordering scope.
+For fan-out, global order is evaluated per subscriber; for competing consumers
+it is evaluated across the observed worker group.
+
+Kafka's native scope is a topic partition within a consumer group, RabbitMQ's is the concrete queue,
+and Redis Streams' is the stream. These labels do not claim equivalent
+guarantees: Kafka ordering is partition-bound, RabbitMQ delivery order can be
+affected by multiple consumers, acknowledgements, redelivery, and priorities,
+and Redis Stream IDs order appended entries while consumer-group processing
+can complete in a different order. Redis Pub/Sub exposes no durable native
+scope in this lab, so only its application-observed global result is reported.
+
+`consumerDelayMs` pauses measured delivery handling before recording the
+observation and acknowledgement. It is application-controlled fault injection;
+warm-up messages are not delayed. Loss and duplicate counters remain active,
+so a slow-consumer run records anomalies instead of hiding them.
+
+The backlog value is deliberately application-observed: expected deliveries
+for publication attempts submitted by the producer minus unique deliveries seen by
+the benchmark. Its maximum and final value are persisted. It is not Kafka
+consumer lag, RabbitMQ ready-message depth, or Redis pending-entry count, and
+those broker-native values are not combined. Delay sweeps plot median
+throughput, p95 latency, and maximum observed backlog on separate curves.
 
 ## Native capability demonstrations
 

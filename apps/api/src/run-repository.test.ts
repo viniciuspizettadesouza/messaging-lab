@@ -66,6 +66,11 @@ describe('RunRepository', () => {
       lostMessages: 0,
       duplicateMessages: 0,
       errorCount: 1,
+      ordering: { globalViolations: 0, nativeScopeViolations: 0 },
+      backlog: {
+        maximumObservedMessages: 10,
+        finalObservedMessages: 0,
+      },
     });
     const completed = repository.updateStatus(created.id, 'completed');
 

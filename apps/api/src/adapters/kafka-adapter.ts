@@ -124,10 +124,16 @@ class KafkaRun implements BrokerRunResource {
       this.consumers.push(consumer);
       void consumer
         .run({
-          eachMessage: async ({ message }) => {
+          eachMessage: async ({ message, partition }) => {
             if (!message.value)
               throw new Error('Kafka delivered an empty message.');
-            await onDelivery(decodeMessage(message.value, consumerId));
+            await onDelivery(
+              decodeMessage(
+                message.value,
+                consumerId,
+                `group:${groupId}:partition:${partition}`,
+              ),
+            );
           },
         })
         .catch((error: unknown) => {
@@ -143,7 +149,7 @@ class KafkaRun implements BrokerRunResource {
     await this.producer.send({
       topic: this.topic,
       acks: -1,
-      messages: [{ key: message.id, value: encodeMessage(message) }],
+      messages: [{ key: message.orderingKey, value: encodeMessage(message) }],
     });
     this.publishedMessages += 1;
   }
@@ -171,10 +177,16 @@ class KafkaRun implements BrokerRunResource {
       await consumer.connect();
       await consumer.subscribe({ topic: this.topic, fromBeginning: true });
       await consumer.run({
-        eachMessage: async ({ message }) => {
+        eachMessage: async ({ message, partition }) => {
           if (!message.value)
             throw new Error('Kafka delivered an empty message.');
-          await onDelivery(decodeMessage(message.value, 'kafka-replay'));
+          await onDelivery(
+            decodeMessage(
+              message.value,
+              'kafka-replay',
+              `partition:${partition}`,
+            ),
+          );
           receivedMessages += 1;
           if (receivedMessages >= this.publishedMessages) resolveReplay?.();
         },
@@ -227,10 +239,16 @@ class KafkaRun implements BrokerRunResource {
       await consumer.subscribe({ topic: this.topic, fromBeginning: true });
       await consumer.run({
         autoCommit: false,
-        eachMessage: async ({ message }) => {
+        eachMessage: async ({ message, partition }) => {
           if (!message.value)
             throw new Error('Kafka delivered an empty replay message.');
-          await onDelivery(decodeMessage(message.value, 'kafka-offset-reset'));
+          await onDelivery(
+            decodeMessage(
+              message.value,
+              'kafka-offset-reset',
+              `partition:${partition}`,
+            ),
+          );
           receivedMessages += 1;
           if (receivedMessages >= this.publishedMessages) resolveReplay?.();
         },
@@ -285,7 +303,7 @@ class KafkaRun implements BrokerRunResource {
       await this.producer.send({
         topic: recoveryTopic,
         acks: -1,
-        messages: [{ key: message.id, value: encodeMessage(message) }],
+        messages: [{ key: message.orderingKey, value: encodeMessage(message) }],
       });
       await withTimeout(failedDelivery, 'Kafka recovery setup timed out.');
       await failedConsumer.stop();
@@ -307,7 +325,11 @@ class KafkaRun implements BrokerRunResource {
             throw new Error('Kafka delivered an empty recovery message.');
           }
           await onDelivery(
-            decodeMessage(kafkaMessage.value, 'kafka-recovered-consumer'),
+            decodeMessage(
+              kafkaMessage.value,
+              'kafka-recovered-consumer',
+              `partition:${partition}`,
+            ),
           );
           await recoveredConsumer.commitOffsets([
             {

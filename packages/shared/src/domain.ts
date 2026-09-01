@@ -82,6 +82,18 @@ export const benchmarkMetricsSchema = z
     lostMessages: nonNegativeIntegerSchema,
     duplicateMessages: nonNegativeIntegerSchema,
     errorCount: nonNegativeIntegerSchema,
+    ordering: z
+      .object({
+        globalViolations: nonNegativeIntegerSchema,
+        nativeScopeViolations: nonNegativeIntegerSchema,
+      })
+      .strict(),
+    backlog: z
+      .object({
+        maximumObservedMessages: nonNegativeIntegerSchema,
+        finalObservedMessages: nonNegativeIntegerSchema,
+      })
+      .strict(),
   })
   .strict()
   .superRefine(({ latency }, context) => {

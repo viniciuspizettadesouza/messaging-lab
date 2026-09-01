@@ -67,8 +67,8 @@ export class RunRepository {
         `INSERT INTO runs (
           id, broker, scenario, message_count, payload_size_bytes,
           producer_concurrency, consumer_count, timeout_ms, status, created_at,
-          name, description
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
+          name, description, consumer_delay_ms
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -82,6 +82,7 @@ export class RunRepository {
         createdAt,
         metadata.name ?? null,
         metadata.description ?? null,
+        configuration.consumerDelayMs,
       );
 
     return this.requireById(id);
@@ -194,7 +195,9 @@ export class RunRepository {
           run_id, elapsed_ms, throughput_messages_per_second,
           p50_ms, p95_ms, p99_ms, published_messages, received_messages,
           lost_messages, duplicate_messages, error_count
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          , global_ordering_violations, native_scope_ordering_violations,
+          maximum_observed_backlog, final_observed_backlog
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(run_id) DO UPDATE SET
           elapsed_ms = excluded.elapsed_ms,
           throughput_messages_per_second = excluded.throughput_messages_per_second,
@@ -205,7 +208,11 @@ export class RunRepository {
           received_messages = excluded.received_messages,
           lost_messages = excluded.lost_messages,
           duplicate_messages = excluded.duplicate_messages,
-          error_count = excluded.error_count`,
+          error_count = excluded.error_count,
+          global_ordering_violations = excluded.global_ordering_violations,
+          native_scope_ordering_violations = excluded.native_scope_ordering_violations,
+          maximum_observed_backlog = excluded.maximum_observed_backlog,
+          final_observed_backlog = excluded.final_observed_backlog`,
       )
       .run(
         id,
@@ -219,6 +226,10 @@ export class RunRepository {
         parsed.lostMessages,
         parsed.duplicateMessages,
         parsed.errorCount,
+        parsed.ordering.globalViolations,
+        parsed.ordering.nativeScopeViolations,
+        parsed.backlog.maximumObservedMessages,
+        parsed.backlog.finalObservedMessages,
       );
 
     return this.requireById(id);

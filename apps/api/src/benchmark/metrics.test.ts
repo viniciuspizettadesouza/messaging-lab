@@ -41,6 +41,8 @@ describe('createMetrics', () => {
       lostMessages: 5,
       duplicateMessages: 2,
       errorCount: 0,
+      ordering: { globalViolations: 0, nativeScopeViolations: 0 },
+      backlog: { maximumObservedMessages: 0, finalObservedMessages: 0 },
     });
   });
 });

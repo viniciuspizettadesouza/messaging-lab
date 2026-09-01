@@ -51,6 +51,10 @@ export interface MetricInput {
   readonly duplicateDeliveries: number;
   readonly latency: BenchmarkMetrics['latency'];
   readonly errorCount?: number;
+  readonly globalOrderingViolations?: number;
+  readonly nativeScopeOrderingViolations?: number;
+  readonly maximumObservedBacklog?: number;
+  readonly finalObservedBacklog?: number;
 }
 
 export function createMetrics(input: MetricInput): BenchmarkMetrics {
@@ -67,6 +71,14 @@ export function createMetrics(input: MetricInput): BenchmarkMetrics {
     ),
     duplicateMessages: input.duplicateDeliveries,
     errorCount: input.errorCount ?? 0,
+    ordering: {
+      globalViolations: input.globalOrderingViolations ?? 0,
+      nativeScopeViolations: input.nativeScopeOrderingViolations ?? 0,
+    },
+    backlog: {
+      maximumObservedMessages: input.maximumObservedBacklog ?? 0,
+      finalObservedMessages: input.finalObservedBacklog ?? 0,
+    },
   };
 }
 

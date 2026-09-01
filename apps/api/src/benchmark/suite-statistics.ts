@@ -82,6 +82,11 @@ export function summarizeSuiteCombinations(
             metrics.map(({ latency }) => latency.p99Ms),
           ),
         },
+        backlog: {
+          maximumObservedMessages: summarizeDistribution(
+            metrics.map(({ backlog }) => backlog.maximumObservedMessages),
+          ),
+        },
         totals: {
           publishedMessages: sum(
             metrics.map(({ publishedMessages }) => publishedMessages),
@@ -96,6 +101,12 @@ export function summarizeSuiteCombinations(
           // Redelivery tracking is introduced by the recovery experiments. The
           // current performance workloads cannot produce a redelivery count.
           redeliveredMessages: 0,
+          globalOrderingViolations: sum(
+            metrics.map(({ ordering }) => ordering.globalViolations),
+          ),
+          nativeScopeOrderingViolations: sum(
+            metrics.map(({ ordering }) => ordering.nativeScopeViolations),
+          ),
           errors:
             sum(metrics.map(({ errorCount }) => errorCount)) +
             sum(trials.map((trial) => trial.run?.errors.length ?? 0)),

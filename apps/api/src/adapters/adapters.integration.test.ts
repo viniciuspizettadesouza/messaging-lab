@@ -59,7 +59,7 @@ describeIntegration('broker adapters', () => {
     ),
   )(
     '$name delivers $scenario messages with the expected distribution',
-    async ({ adapter, scenario }) => {
+    async ({ adapter, name, scenario }) => {
       const messageCount = 6;
       const consumerCount = 2;
       const expectedDeliveries =
@@ -82,6 +82,10 @@ describeIntegration('broker adapters', () => {
         for (let index = 0; index < messageCount; index += 1) {
           await resource.publish({
             id: `message-${index}`,
+            globalSequence: index,
+            producerId: 'integration-producer',
+            producerSequence: index,
+            orderingKey: 'integration-producer',
             payload: Buffer.from(`payload-${index}`),
             publishedAtNanoseconds: process.hrtime.bigint(),
           });
@@ -89,6 +93,19 @@ describeIntegration('broker adapters', () => {
 
         await waitFor(() => deliveries.length === expectedDeliveries);
         expect(deliveries).toHaveLength(expectedDeliveries);
+        if (name === 'redis' && scenario === 'fan-out') {
+          expect(
+            deliveries.every(
+              ({ nativeOrderScope }) => nativeOrderScope === null,
+            ),
+          ).toBe(true);
+        } else {
+          expect(
+            deliveries.every(
+              ({ nativeOrderScope }) => nativeOrderScope !== null,
+            ),
+          ).toBe(true);
+        }
         expectDeliveryDistribution(
           deliveries,
           scenario,
@@ -112,6 +129,10 @@ describeIntegration('broker adapters', () => {
           await resource.demonstrateRecovery(
             {
               id: 'recovery-message',
+              globalSequence: 0,
+              producerId: 'recovery-producer',
+              producerSequence: 0,
+              orderingKey: 'recovery-producer',
               payload: Buffer.from('recovery-payload'),
               publishedAtNanoseconds: process.hrtime.bigint(),
             },

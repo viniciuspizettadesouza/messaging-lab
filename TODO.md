@@ -144,14 +144,14 @@ The completed baseline records what was built under the original three-system co
 
 ## 19. Ordering and backpressure experiments
 
-- [ ] Add producer and per-key sequence metadata to the benchmark message envelope.
-- [ ] Measure global and broker-native-scope ordering violations separately.
-- [ ] Document Kafka partition ordering, RabbitMQ queue delivery ordering, and Redis Stream ID ordering as separate native scopes rather than corresponding guarantees.
-- [ ] Add configurable artificial consumer delay.
-- [ ] Track backlog or lag only where its broker-specific meaning is clear.
-- [ ] Plot throughput, latency, and backlog behavior as consumer delay increases.
-- [ ] Record whether loss or duplicates occur during slow consumption and recovery.
-- [ ] Add unit and Docker-backed integration tests for ordering and slow-consumer behavior.
+- [x] Add producer and per-key sequence metadata to the benchmark message envelope.
+- [x] Measure global and broker-native-scope ordering violations separately.
+- [x] Document Kafka partition ordering, RabbitMQ queue delivery ordering, and Redis Stream ID ordering as separate native scopes rather than corresponding guarantees.
+- [x] Add configurable artificial consumer delay.
+- [x] Track backlog or lag only where its broker-specific meaning is clear.
+- [x] Plot throughput, latency, and backlog behavior as consumer delay increases.
+- [x] Record whether loss or duplicates occur during slow consumption and recovery.
+- [x] Add unit and Docker-backed integration tests for ordering and slow-consumer behavior.
 
 ## 20. End-to-end reliability and accessibility
 

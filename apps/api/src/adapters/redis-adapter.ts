@@ -204,7 +204,9 @@ class RedisStreamsRun implements BrokerRunResource {
     ]);
 
     for (const entry of parseStreamEntries(response)) {
-      await onDelivery(decodeMessage(entry.encoded, 'redis-replay'));
+      await onDelivery(
+        decodeMessage(entry.encoded, 'redis-replay', `stream:${this.stream}`),
+      );
     }
   }
 
@@ -267,7 +269,11 @@ class RedisStreamsRun implements BrokerRunResource {
 
       if (!entry) throw new Error('Redis did not recover the pending message.');
       await onDelivery(
-        decodeMessage(entry.encoded, 'redis-recovered-consumer'),
+        decodeMessage(
+          entry.encoded,
+          'redis-recovered-consumer',
+          `stream:${this.stream}`,
+        ),
       );
       await recovered.sendCommand([
         'XACK',
@@ -335,7 +341,9 @@ class RedisStreamsRun implements BrokerRunResource {
       ]);
 
       for (const entry of parseReadGroupResponse(response)) {
-        await onDelivery(decodeMessage(entry.encoded, consumerId));
+        await onDelivery(
+          decodeMessage(entry.encoded, consumerId, `stream:${this.stream}`),
+        );
         await consumer.sendCommand(['XACK', this.stream, this.group, entry.id]);
       }
     }

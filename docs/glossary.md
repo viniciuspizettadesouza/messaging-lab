@@ -63,3 +63,21 @@ and Redis Pub/Sub offers neither behavior.
 For ephemeral delivery during subscriber absence this is expected semantics;
 for a durable workload it indicates a failure or configuration problem that
 must remain visible in the result.
+
+## Ordering and pressure
+
+**Global ordering** is the arrival order observed by the benchmark across a
+subscriber path or competing-consumer group. It is stricter than most broker
+guarantees and is reported independently.
+
+**Native ordering scope** is the broker structure in which order has a defined
+meaning: a Kafka consumer-group partition, RabbitMQ queue, or Redis stream. Matching labels do
+not imply matching guarantees or processing completion order.
+
+**Consumer delay** is an application-controlled pause before a measured
+delivery is recorded and acknowledged. It demonstrates slow-consumer effects
+without controlling Docker, the network, or broker processes.
+
+**Observed backlog** is the number of expected deliveries already published
+but not yet seen at the application boundary. It is not a broker-native lag,
+queue-depth, or pending-entry measurement.

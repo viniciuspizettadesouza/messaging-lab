@@ -53,6 +53,7 @@ Validates and starts one asynchronous benchmark. Returns `202 Accepted` with the
   "payloadSizeBytes": 1024,
   "producerConcurrency": 1,
   "consumerCount": 1,
+  "consumerDelayMs": 0,
   "timeoutMs": 120000
 }
 ```
@@ -135,6 +136,7 @@ benchmark lane until it completes or is cancelled, including cooldown periods.
     "payloadSizeBytes": 1024,
     "producerConcurrency": 1,
     "consumerCount": 1,
+    "consumerDelayMs": 0,
     "timeoutMs": 120000
   },
   "combinations": [
@@ -158,7 +160,8 @@ unique combinations, 20 repetitions, a 60,000 ms cooldown, and 100 generated
 runs. Supported order strategies are `fixed`, `rotating`, and `randomized`.
 Randomized order is generated once and persisted with the suite.
 An optional one-dimensional `sweep` supports `consumerCount`,
-`producerConcurrency`, `payloadSizeBytes`, or `messageCount`. It requires 2–20
+`producerConcurrency`, `payloadSizeBytes`, `messageCount`, or
+`consumerDelayMs`. It requires 2–20
 unique, strictly increasing integer values inside the corresponding workload
 limit. Sweep points count toward the 100-run maximum.
 An optional description of at most 500 characters can accompany the required
@@ -180,8 +183,8 @@ Suite statuses are `pending`, `running`, `completed`, `failed`, `cancelled`, and
 
 Returns one suite and every ordered trial. Entries for queued trials have a
 null `run`; started trials embed their persisted run. `combinationSummaries`
-contains success/failure counts, five-number throughput and p50/p95/p99 latency
-distributions, IQR, and aggregate delivery anomalies for each configured
+contains success/failure counts, five-number throughput, p50/p95/p99 latency,
+and observed-backlog distributions, IQR, ordering violations, and aggregate delivery anomalies for each configured
 broker/scenario combination.
 For sweep suites, trials and summaries also contain `sweepPointIndex` and
 `sweepValue`; summaries are grouped by broker, scenario, and sweep point.
@@ -201,6 +204,8 @@ Downloads the suite and all underlying trials. JSON uses the same validated
 suite contract as the detail endpoint. CSV emits one row per ordered trial,
 including queued and unsuccessful trials, configuration identity, lifecycle
 timestamps, metrics, anomaly counts, errors, and environment provenance.
+Ordering and application-observed backlog fields are included with each
+completed trial.
 The `comparison_track` CSV column makes semantic boundaries explicit;
 `sweep_parameter` and `sweep_value` preserve the curve axis.
 

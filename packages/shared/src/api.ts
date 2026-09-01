@@ -68,7 +68,7 @@ export const suiteProgressSchema = z
     currentPosition: z.number().int().nonnegative().nullable(),
     currentCombination: suiteCombinationSchema.nullable(),
     currentRepetition: z.number().int().positive().nullable(),
-    currentSweepValue: z.number().int().positive().nullable().optional(),
+    currentSweepValue: z.number().int().nonnegative().nullable().optional(),
     activeRunId: runIdSchema.nullable(),
   })
   .strict()
@@ -201,7 +201,7 @@ export const suiteCombinationSummarySchema = z
     combinationIndex: z.number().int().nonnegative(),
     combination: suiteCombinationSchema,
     sweepPointIndex: z.number().int().nonnegative().nullable().optional(),
-    sweepValue: z.number().int().positive().nullable().optional(),
+    sweepValue: z.number().int().nonnegative().nullable().optional(),
     comparisonTrack: comparisonTrackIdSchema,
     totalTrials: z.number().int().positive(),
     successfulTrials: z.number().int().nonnegative(),
@@ -215,6 +215,11 @@ export const suiteCombinationSummarySchema = z
         p99Ms: distributionSummarySchema.nullable(),
       })
       .strict(),
+    backlog: z
+      .object({
+        maximumObservedMessages: distributionSummarySchema.nullable(),
+      })
+      .strict(),
     totals: z
       .object({
         publishedMessages: z.number().int().nonnegative(),
@@ -222,6 +227,8 @@ export const suiteCombinationSummarySchema = z
         lostMessages: z.number().int().nonnegative(),
         duplicateMessages: z.number().int().nonnegative(),
         redeliveredMessages: z.number().int().nonnegative(),
+        globalOrderingViolations: z.number().int().nonnegative(),
+        nativeScopeOrderingViolations: z.number().int().nonnegative(),
         errors: z.number().int().nonnegative(),
       })
       .strict(),
@@ -281,7 +288,7 @@ export const suiteRunSchema = z
     repetition: z.number().int().positive(),
     combination: suiteCombinationSchema,
     sweepPointIndex: z.number().int().nonnegative().nullable().optional(),
-    sweepValue: z.number().int().positive().nullable().optional(),
+    sweepValue: z.number().int().nonnegative().nullable().optional(),
     comparisonTrack: comparisonTrackIdSchema,
     run: runSchema.nullable(),
   })

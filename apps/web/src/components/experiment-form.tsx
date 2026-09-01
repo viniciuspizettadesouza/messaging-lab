@@ -44,6 +44,7 @@ const SWEEP_LABELS: Record<SweepParameter, string> = {
   producerConcurrency: 'Producers',
   payloadSizeBytes: 'Payload size (bytes)',
   messageCount: 'Message count',
+  consumerDelayMs: 'Consumer delay (ms)',
 };
 interface WorkloadPreset {
   readonly name: string;
@@ -68,6 +69,9 @@ export function ExperimentForm({
   );
   const [consumerCount, setConsumerCount] = useState<number>(
     BENCHMARK_DEFAULTS.consumerCount,
+  );
+  const [consumerDelayMs, setConsumerDelayMs] = useState<number>(
+    BENCHMARK_DEFAULTS.consumerDelayMs,
   );
   const [timeoutMs, setTimeoutMs] = useState<number>(
     BENCHMARK_DEFAULTS.timeoutMs,
@@ -162,6 +166,7 @@ export function ExperimentForm({
       payloadSizeBytes,
       producerConcurrency,
       consumerCount,
+      consumerDelayMs,
       timeoutMs,
     };
   }
@@ -204,6 +209,7 @@ export function ExperimentForm({
     setPayloadSizeBytes(preset.workload.payloadSizeBytes);
     setProducerConcurrency(preset.workload.producerConcurrency);
     setConsumerCount(preset.workload.consumerCount);
+    setConsumerDelayMs(preset.workload.consumerDelayMs);
     setTimeoutMs(preset.workload.timeoutMs);
   }
 
@@ -318,6 +324,12 @@ export function ExperimentForm({
               value={consumerCount}
               limits={BENCHMARK_LIMITS.consumerCount}
               onChange={setConsumerCount}
+            />
+            <NumberField
+              label="Consumer delay (ms)"
+              value={consumerDelayMs}
+              limits={BENCHMARK_LIMITS.consumerDelayMs}
+              onChange={setConsumerDelayMs}
             />
             <NumberField
               label="Timeout (ms)"

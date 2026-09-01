@@ -86,6 +86,11 @@ function trial(
             lostMessages: anomalies.lost,
             duplicateMessages: anomalies.duplicates,
             errorCount: anomalies.errors,
+            ordering: { globalViolations: 0, nativeScopeViolations: 0 },
+            backlog: {
+              maximumObservedMessages: 2,
+              finalObservedMessages: 0,
+            },
           }
         : null,
     notes: [],

@@ -60,6 +60,28 @@ describeIntegration('complete benchmark runs', () => {
       });
       expect(metrics.elapsedMs).toBeGreaterThanOrEqual(0);
       expect(metrics.throughputMessagesPerSecond).toBeGreaterThan(0);
+      expect(metrics.ordering.nativeScopeViolations).toBe(0);
+      expect(metrics.backlog.finalObservedMessages).toBe(0);
+    },
+    45_000,
+  );
+
+  it.each(adapters)(
+    '$name observes slow-consumer latency and drains backlog',
+    async ({ adapter, name }) => {
+      const metrics = await executeBenchmark(
+        adapter,
+        name,
+        'competing-consumers',
+        5,
+      );
+
+      expect(metrics.latency.p50Ms).toBeGreaterThanOrEqual(5);
+      expect(metrics.backlog.maximumObservedMessages).toBeGreaterThan(0);
+      expect(metrics.backlog.finalObservedMessages).toBe(0);
+      expect(metrics.lostMessages).toBe(0);
+      expect(metrics.duplicateMessages).toBe(0);
+      expect(metrics.ordering.nativeScopeViolations).toBe(0);
     },
     45_000,
   );
@@ -69,6 +91,7 @@ async function executeBenchmark(
   adapter: BrokerAdapter,
   broker: BrokerId,
   scenario: ScenarioId,
+  consumerDelayMs = 0,
 ) {
   const controller = new AbortController();
   const timeout = setTimeout(
@@ -90,6 +113,7 @@ async function executeBenchmark(
         producerConcurrency: 2,
         consumerCount: 2,
         timeoutMs: 30_000,
+        consumerDelayMs,
       },
     });
   } finally {

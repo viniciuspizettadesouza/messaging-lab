@@ -175,6 +175,7 @@ describe('suiteConfigurationSchema', () => {
     ['producerConcurrency', 1, 32],
     ['payloadSizeBytes', 1, 1_048_576],
     ['messageCount', 1, 1_000_000],
+    ['consumerDelayMs', 0, 10_000],
   ] as const)(
     'accepts safe %s sweep boundaries',
     (parameter, minimum, maximum) => {

@@ -14,7 +14,12 @@ export class ImmediateAdapter implements BrokerAdapter {
   public cleaned = false;
   public readonly publishedPayloadSizes: number[] = [];
 
-  public constructor(private readonly duplicate = false) {}
+  public constructor(
+    private readonly duplicate = false,
+    private readonly deliveryDelayMs: (
+      message: OutboundMessage,
+    ) => number = () => 0,
+  ) {}
 
   public async checkHealth() {
     return {
@@ -32,6 +37,10 @@ export class ImmediateAdapter implements BrokerAdapter {
     const published: OutboundMessage[] = [];
     const deliver = async (message: OutboundMessage) => {
       if (!handler) return;
+      const delayMs = this.deliveryDelayMs(message);
+      if (delayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
       const deliveries =
         context.scenario === 'fan-out'
           ? Array.from({ length: context.consumerCount }, (_, index) =>
@@ -77,5 +86,5 @@ function delivery(
   message: OutboundMessage,
   consumerId: string,
 ): BrokerDelivery {
-  return { ...message, consumerId };
+  return { ...message, consumerId, nativeOrderScope: 'fake:scope' };
 }

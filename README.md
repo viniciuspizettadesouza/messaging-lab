@@ -15,10 +15,12 @@ This project is an educational lab, not a universal broker ranking. Results desc
 - Build persistent suites from selected broker/pattern combinations.
 - Configure suite repetitions, fixed/rotating/randomized order, and cooldown.
 - Sweep consumers, producers, payload size, or message count along one safe axis and inspect track-specific curves.
+- Add artificial consumer delay, sweep it, and inspect latency and application-observed backlog curves.
 - Configure message count, payload size, producer concurrency, consumers, and timeout.
 - Watch publishing and consumption progress through Server-Sent Events (SSE).
 - Compare throughput and p50/p95/p99 end-to-end latency.
 - Inspect delivery counts, loss, duplicates, capability notes, and errors.
+- Inspect global and broker-native-scope ordering violations independently.
 - Keep aggregate run history in SQLite across application restarts.
 - Restore active suites after reload and inspect their ordered trials and failures.
 - Compare repeated trials with medians, quartiles, ranges, anomaly totals, and low-sample warnings.

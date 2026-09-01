@@ -224,6 +224,10 @@ export class RecoveryExperimentEngine {
 function message(id: string, seed: number) {
   return {
     id,
+    globalSequence: seed,
+    producerId: 'recovery-producer',
+    producerSequence: seed,
+    orderingKey: 'recovery',
     payload: createDeterministicPayload(64, seed),
     publishedAtNanoseconds: process.hrtime.bigint(),
   };

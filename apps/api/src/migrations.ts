@@ -143,6 +143,22 @@ export const migrations: readonly Migration[] = [
       );
     `,
   },
+  {
+    version: 6,
+    name: 'ordering and backpressure observations',
+    sql: `
+      ALTER TABLE runs ADD COLUMN consumer_delay_ms INTEGER NOT NULL DEFAULT 0
+        CHECK (consumer_delay_ms BETWEEN 0 AND 10000);
+      ALTER TABLE run_metrics ADD COLUMN global_ordering_violations INTEGER NOT NULL DEFAULT 0
+        CHECK (global_ordering_violations >= 0);
+      ALTER TABLE run_metrics ADD COLUMN native_scope_ordering_violations INTEGER NOT NULL DEFAULT 0
+        CHECK (native_scope_ordering_violations >= 0);
+      ALTER TABLE run_metrics ADD COLUMN maximum_observed_backlog INTEGER NOT NULL DEFAULT 0
+        CHECK (maximum_observed_backlog >= 0);
+      ALTER TABLE run_metrics ADD COLUMN final_observed_backlog INTEGER NOT NULL DEFAULT 0
+        CHECK (final_observed_backlog >= 0);
+    `,
+  },
 ];
 
 export function migrateDatabase(database: DatabaseSync): void {

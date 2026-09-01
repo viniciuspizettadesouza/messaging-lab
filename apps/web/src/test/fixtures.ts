@@ -91,6 +91,11 @@ export function createRun(status: RunStatus = 'pending'): Run {
             lostMessages: 0,
             duplicateMessages: 0,
             errorCount: 0,
+            ordering: { globalViolations: 0, nativeScopeViolations: 0 },
+            backlog: {
+              maximumObservedMessages: 3,
+              finalObservedMessages: 0,
+            },
           }
         : null,
     notes: ['Redis Pub/Sub delivers only to connected subscribers.'],
@@ -190,12 +195,20 @@ export function createSuite(
         p95Ms: distribution(metrics?.latency.p95Ms),
         p99Ms: distribution(metrics?.latency.p99Ms),
       },
+      backlog: {
+        maximumObservedMessages: distribution(
+          metrics?.backlog.maximumObservedMessages,
+        ),
+      },
       totals: {
         publishedMessages: metrics?.publishedMessages ?? 0,
         receivedMessages: metrics?.receivedMessages ?? 0,
         lostMessages: metrics?.lostMessages ?? 0,
         duplicateMessages: metrics?.duplicateMessages ?? 0,
         redeliveredMessages: 0,
+        globalOrderingViolations: metrics?.ordering.globalViolations ?? 0,
+        nativeScopeOrderingViolations:
+          metrics?.ordering.nativeScopeViolations ?? 0,
         errors: (metrics?.errorCount ?? 0) + (trial.run?.errors.length ?? 0),
       },
     };

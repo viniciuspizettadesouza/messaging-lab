@@ -245,6 +245,10 @@ function Provenance({ suite }: { readonly suite: Suite }) {
             value={suite.configuration.workload.consumerCount}
           />
           <Definition
+            label="Consumer delay"
+            value={`${suite.configuration.workload.consumerDelayMs} ms`}
+          />
+          <Definition
             label="Timeout"
             value={`${suite.configuration.workload.timeoutMs} ms`}
           />
@@ -366,7 +370,8 @@ function SweepCurves({ suite }: { readonly suite: Suite }) {
       <h3 id="sweep-curves-heading">Parameter sweep curves</h3>
       <p className="muted">
         Median results by {sweepLabel(sweep.parameter).toLowerCase()}; each
-        broker-native mechanism remains in its comparison track.
+        broker-native mechanism remains in its comparison track. Backlog is
+        measured at the application boundary, not as interchangeable broker lag.
       </p>
       {suite.comparisonTracks.map((track) => (
         <section
@@ -403,6 +408,16 @@ function SweepCurves({ suite }: { readonly suite: Suite }) {
                       points={points.map((point) => ({
                         x: point.sweepValue!,
                         y: point.latency.p95Ms?.median ?? null,
+                      }))}
+                    />
+                    <CurveChart
+                      title="Median observed backlog"
+                      unit="deliveries"
+                      parameter={sweep.parameter}
+                      points={points.map((point) => ({
+                        x: point.sweepValue!,
+                        y:
+                          point.backlog.maximumObservedMessages?.median ?? null,
                       }))}
                     />
                   </div>
@@ -492,6 +507,7 @@ function sweepLabel(parameter: SweepParameter): string {
     producerConcurrency: 'Producers',
     payloadSizeBytes: 'Payload bytes',
     messageCount: 'Messages',
+    consumerDelayMs: 'Consumer delay (ms)',
   }[parameter];
 }
 
@@ -541,9 +557,22 @@ function CombinationAggregate({
         distribution={summary.latency.p99Ms}
         unit="ms"
       />
+      <DistributionRow
+        label="Maximum observed backlog"
+        distribution={summary.backlog.maximumObservedMessages}
+        unit="deliveries"
+      />
       <dl className="aggregate-totals">
         <Total label="Lost" value={summary.totals.lostMessages} />
         <Total label="Duplicates" value={summary.totals.duplicateMessages} />
+        <Total
+          label="Global order violations"
+          value={summary.totals.globalOrderingViolations}
+        />
+        <Total
+          label="Native-scope order violations"
+          value={summary.totals.nativeScopeOrderingViolations}
+        />
         <Total
           label="Redeliveries"
           value={summary.totals.redeliveredMessages}

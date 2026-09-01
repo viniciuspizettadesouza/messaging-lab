@@ -20,6 +20,8 @@ const validMetrics = {
   lostMessages: 0,
   duplicateMessages: 0,
   errorCount: 0,
+  ordering: { globalViolations: 0, nativeScopeViolations: 0 },
+  backlog: { maximumObservedMessages: 10, finalObservedMessages: 0 },
 };
 
 describe('domain identifier schemas', () => {

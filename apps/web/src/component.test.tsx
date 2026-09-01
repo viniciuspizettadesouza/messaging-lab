@@ -141,13 +141,18 @@ describe('dashboard components', () => {
     );
     await user.clear(cooldown);
     await user.type(cooldown, '500');
+    const consumerDelay = screen.getByRole('spinbutton', {
+      name: /Consumer delay \(ms\)/,
+    });
+    await user.clear(consumerDelay);
+    await user.type(consumerDelay, '10');
     await user.selectOptions(
       screen.getByRole('combobox', { name: /Parameter sweep/ }),
-      'consumerCount',
+      'consumerDelayMs',
     );
     const sweepValues = screen.getByRole('textbox', { name: /Sweep values/ });
     await user.clear(sweepValues);
-    await user.type(sweepValues, '1, 2, 4');
+    await user.type(sweepValues, '0, 5, 10');
     expect(
       screen.getByText('30 generated runs (maximum 100)'),
     ).toBeInTheDocument();
@@ -160,7 +165,8 @@ describe('dashboard components', () => {
         repetitions: 2,
         orderStrategy: 'randomized',
         cooldownMs: 500,
-        sweep: { parameter: 'consumerCount', values: [1, 2, 4] },
+        workload: expect.objectContaining({ consumerDelayMs: 10 }),
+        sweep: { parameter: 'consumerDelayMs', values: [0, 5, 10] },
         combinations: expect.not.arrayContaining([
           { broker: 'redis', scenario: 'fan-out' },
         ]),

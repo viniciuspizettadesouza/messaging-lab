@@ -116,42 +116,74 @@ export function RunDetail({
       ) : null}
 
       {run.metrics ? (
-        <div className="metric-grid">
-          <Metric
-            label="Throughput"
-            value={`${formatNumber(run.metrics.throughputMessagesPerSecond)} msg/s`}
-          />
-          <Metric
-            label="Elapsed"
-            value={`${formatNumber(run.metrics.elapsedMs)} ms`}
-          />
-          <Metric
-            label="p50 latency"
-            value={`${formatNumber(run.metrics.latency.p50Ms, 2)} ms`}
-          />
-          <Metric
-            label="p95 latency"
-            value={`${formatNumber(run.metrics.latency.p95Ms, 2)} ms`}
-          />
-          <Metric
-            label="p99 latency"
-            value={`${formatNumber(run.metrics.latency.p99Ms, 2)} ms`}
-          />
-          <Metric
-            label="Delivered"
-            value={`${formatNumber(run.metrics.receivedMessages, 0)} / ${formatNumber(run.metrics.publishedMessages, 0)}`}
-          />
-          <Metric
-            label="Lost"
-            value={formatNumber(run.metrics.lostMessages, 0)}
-            alert={run.metrics.lostMessages > 0}
-          />
-          <Metric
-            label="Duplicates"
-            value={formatNumber(run.metrics.duplicateMessages, 0)}
-            alert={run.metrics.duplicateMessages > 0}
-          />
-        </div>
+        <>
+          <div className="metric-grid">
+            <Metric
+              label="Throughput"
+              value={`${formatNumber(run.metrics.throughputMessagesPerSecond)} msg/s`}
+            />
+            <Metric
+              label="Elapsed"
+              value={`${formatNumber(run.metrics.elapsedMs)} ms`}
+            />
+            <Metric
+              label="p50 latency"
+              value={`${formatNumber(run.metrics.latency.p50Ms, 2)} ms`}
+            />
+            <Metric
+              label="p95 latency"
+              value={`${formatNumber(run.metrics.latency.p95Ms, 2)} ms`}
+            />
+            <Metric
+              label="p99 latency"
+              value={`${formatNumber(run.metrics.latency.p99Ms, 2)} ms`}
+            />
+            <Metric
+              label="Delivered"
+              value={`${formatNumber(run.metrics.receivedMessages, 0)} / ${formatNumber(run.metrics.publishedMessages, 0)}`}
+            />
+            <Metric
+              label="Lost"
+              value={formatNumber(run.metrics.lostMessages, 0)}
+              alert={run.metrics.lostMessages > 0}
+            />
+            <Metric
+              label="Duplicates"
+              value={formatNumber(run.metrics.duplicateMessages, 0)}
+              alert={run.metrics.duplicateMessages > 0}
+            />
+            <Metric
+              label="Global order violations"
+              value={formatNumber(run.metrics.ordering.globalViolations, 0)}
+              alert={run.metrics.ordering.globalViolations > 0}
+            />
+            <Metric
+              label="Native-scope order violations"
+              value={formatNumber(
+                run.metrics.ordering.nativeScopeViolations,
+                0,
+              )}
+              alert={run.metrics.ordering.nativeScopeViolations > 0}
+            />
+            <Metric
+              label="Maximum observed backlog"
+              value={formatNumber(
+                run.metrics.backlog.maximumObservedMessages,
+                0,
+              )}
+            />
+            <Metric
+              label="Final observed backlog"
+              value={formatNumber(run.metrics.backlog.finalObservedMessages, 0)}
+              alert={run.metrics.backlog.finalObservedMessages > 0}
+            />
+          </div>
+          <p className="muted aggregate-intro">
+            Global order is observed at the application path. Native-scope order
+            follows the adapter's partition, queue, or stream boundary. Observed
+            backlog is not a combined broker lag metric.
+          </p>
+        </>
       ) : !active ? (
         <TerminalMessage status={run.status} />
       ) : null}
