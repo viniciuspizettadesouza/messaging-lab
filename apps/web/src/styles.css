@@ -4,14 +4,14 @@
   font-family: 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
   font-synthesis: none;
   --ink: #17211f;
-  --muted: #68736f;
+  --muted: #59645f;
   --paper: #fffdf8;
   --line: #d9d8cf;
   --green: #1f7a5a;
   --green-dark: #105440;
   --lime: #c7ed7f;
   --amber: #d88b34;
-  --red: #b34b43;
+  --red: #9d3933;
   --shadow: 0 18px 45px rgb(31 49 43 / 8%);
 }
 
@@ -406,7 +406,7 @@ select:focus {
   box-shadow: 0 0 0 3px rgb(31 122 90 / 10%);
 }
 label small {
-  color: #909792;
+  color: #66706b;
   font:
     9px ui-monospace,
     'SFMono-Regular',
@@ -447,7 +447,7 @@ label small {
   background: #d6ead7;
 }
 .capability-pills .unsupported {
-  color: #756c62;
+  color: #655c54;
   background: #e3e0d9;
 }
 .primary-button,
@@ -762,7 +762,7 @@ label small {
 }
 .status-failed,
 .status-timed-out {
-  color: #9e453e;
+  color: #9d3933;
   background: #f5dfdc;
 }
 .status-cancelled {

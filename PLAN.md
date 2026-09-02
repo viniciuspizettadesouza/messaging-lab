@@ -247,10 +247,11 @@ Avoid a generic broker superclass. The adapters intentionally expose different d
 
 ### End-to-end tests
 
-Playwright covers the critical path from suite creation to aggregate results
-against an isolated Docker Compose stack. Extend the browser suite with reload
-during an active suite, SSE reconnection, cancellation, filtering, manual
-comparison, export, and mixed-track boundary checks.
+Playwright covers suite creation through aggregate results against an isolated
+Docker Compose stack, including active-suite reload, SSE reconnection,
+suite/run cancellation, history filtering, manual comparison, JSON/CSV export,
+and mixed-track boundary checks. Axe scans the initial and populated dashboard
+states, while browser keyboard checks cover navigation and history traversal.
 
 Performance assertions in CI should focus on correctness and broad sanity checks. Do not enforce narrow absolute throughput or latency thresholds on shared runners.
 

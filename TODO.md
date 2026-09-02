@@ -157,13 +157,13 @@ The completed baseline records what was built under the original three-system co
 
 - [x] Add Playwright and a minimal browser-test configuration.
 - [x] Test suite creation through aggregate result display against the Docker stack.
-- [ ] Test page reload during an active suite.
-- [ ] Test SSE disconnect and reconnection without duplicated terminal handling.
-- [ ] Test suite and standalone-run cancellation from the browser.
-- [ ] Test filtering, manual comparison, and export.
-- [ ] Test that mixed-track suites and selections cannot produce combined rankings or aggregates.
-- [ ] Add automated accessibility checks for the main dashboard states.
-- [ ] Verify keyboard operation and readable progress announcements manually.
+- [x] Test page reload during an active suite.
+- [x] Test SSE disconnect and reconnection without duplicated terminal handling.
+- [x] Test suite and standalone-run cancellation from the browser.
+- [x] Test filtering, manual comparison, and export.
+- [x] Test that mixed-track suites and selections cannot produce combined rankings or aggregates.
+- [x] Add automated accessibility checks for the main dashboard states.
+- [x] Verify keyboard operation and readable progress announcements manually.
 - [x] Keep CI performance assertions limited to correctness and broad sanity bounds.
 
 ## 21. Documentation and publication quality

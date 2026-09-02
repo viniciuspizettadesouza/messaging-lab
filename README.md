@@ -156,6 +156,7 @@ they create. Install the E2E Chromium binary once with
 - [Local development](docs/local-development.md)
 - [Architecture and messaging flows](docs/architecture.md)
 - [Benchmark methodology and interpretation](docs/benchmark-methodology.md)
+- [Accessibility verification](docs/accessibility.md)
 - [Messaging glossary](docs/glossary.md)
 - [Semantic comparison tracks ADR](docs/adr/0001-semantic-comparison-tracks.md)
 - [HTTP API and environment variables](docs/api.md)

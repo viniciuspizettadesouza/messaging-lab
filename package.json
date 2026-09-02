@@ -36,6 +36,7 @@
     "docker:logs": "node scripts/compose.mjs logs --follow"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
     "@eslint/js": "9.33.0",
     "@playwright/test": "1.55.0",
     "@types/node": "24.3.0",

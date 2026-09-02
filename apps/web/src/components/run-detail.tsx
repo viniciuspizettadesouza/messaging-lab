@@ -72,7 +72,7 @@ export function RunDetail({
         <div className="state-notice warning" role="alert">
           <strong>Live connection lost</strong>
           <span>
-            The run may still be active. Reload to restore live updates.
+            Reconnecting automatically. Reload if live updates do not resume.
           </span>
         </div>
       ) : null}
@@ -85,7 +85,15 @@ export function RunDetail({
             </span>
             <strong>{progressPercent}%</strong>
           </div>
-          <div className="progress-track">
+          <div
+            className="progress-track"
+            role="progressbar"
+            aria-label="Run progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progressPercent}
+            aria-valuetext={`${progressPercent}% complete`}
+          >
             <span style={{ width: `${progressPercent}%` }} />
           </div>
           <div className="progress-counts">

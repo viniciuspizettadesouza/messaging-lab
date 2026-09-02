@@ -35,6 +35,7 @@ export function useRunLifecycle({
   const selectedRunRef = useRef<Run | null>(null);
   selectedRunRef.current = selectedRun;
   const unsubscribeRef = useRef<(() => void) | null>(null);
+  const finishingRef = useRef<string | null>(null);
   const onTerminalRef = useRef(onTerminal);
   onTerminalRef.current = onTerminal;
 
@@ -45,6 +46,8 @@ export function useRunLifecycle({
 
   const finishRun = useCallback(
     async (runId: string) => {
+      if (finishingRef.current === runId) return;
+      finishingRef.current = runId;
       stopSubscription();
       try {
         const [run] = await Promise.all([api.getRun(runId), refreshRuns()]);
@@ -52,6 +55,7 @@ export function useRunLifecycle({
       } catch (error) {
         onError(error);
       } finally {
+        finishingRef.current = null;
         onTerminalRef.current();
       }
     },
@@ -65,6 +69,7 @@ export function useRunLifecycle({
       unsubscribeRef.current = api.subscribe(runId, {
         onDisconnect: () => setDisconnected(true),
         onEvent: (event) => {
+          setDisconnected(false);
           if (event.type === 'progress') setProgress(event);
           if (event.type === 'metrics') {
             setSelectedRun((current) =>

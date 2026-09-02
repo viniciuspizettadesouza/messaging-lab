@@ -61,7 +61,8 @@ export function SuiteDetail({
         <div className="state-notice warning" role="alert">
           <strong>Live suite connection lost</strong>
           <span>
-            The server-managed suite is still running. Reload to reconnect.
+            The server-managed suite is still running. Reconnecting
+            automatically; reload if live updates do not resume.
           </span>
         </div>
       ) : null}
