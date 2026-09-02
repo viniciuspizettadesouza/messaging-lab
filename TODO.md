@@ -155,8 +155,8 @@ The completed baseline records what was built under the original three-system co
 
 ## 20. End-to-end reliability and accessibility
 
-- [ ] Add Playwright and a minimal browser-test configuration.
-- [ ] Test suite creation through aggregate result display against the Docker stack.
+- [x] Add Playwright and a minimal browser-test configuration.
+- [x] Test suite creation through aggregate result display against the Docker stack.
 - [ ] Test page reload during an active suite.
 - [ ] Test SSE disconnect and reconnection without duplicated terminal handling.
 - [ ] Test suite and standalone-run cancellation from the browser.
@@ -164,7 +164,7 @@ The completed baseline records what was built under the original three-system co
 - [ ] Test that mixed-track suites and selections cannot produce combined rankings or aggregates.
 - [ ] Add automated accessibility checks for the main dashboard states.
 - [ ] Verify keyboard operation and readable progress announcements manually.
-- [ ] Keep CI performance assertions limited to correctness and broad sanity bounds.
+- [x] Keep CI performance assertions limited to correctness and broad sanity bounds.
 
 ## 21. Documentation and publication quality
 
@@ -172,7 +172,7 @@ The completed baseline records what was built under the original three-system co
 - [ ] Add `docs/experiment-recipes.md` with reproducible workloads and expected observations.
 - [ ] Add `docs/interpreting-results.md` covering medians, spread, outliers, and semantic limits.
 - [ ] Add `docs/troubleshooting.md` for Docker, ports, broker startup, SSE, and orphaned resources.
-- [ ] Add `docs/glossary.md` for messaging and benchmark terminology.
+- [x] Add `docs/glossary.md` for messaging and benchmark terminology.
 - [ ] Add an ADR for serial execution and server-managed suites.
 - [ ] Cross-check the semantic comparison ADR from section 16 against all public documentation and screenshots.
 - [ ] Document database migrations, suite endpoints, events, and environment snapshots.

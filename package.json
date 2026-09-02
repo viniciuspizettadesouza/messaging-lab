@@ -25,6 +25,9 @@
     "test": "vitest run",
     "pretest:integration": "npm run build --workspace @messaging-lab/shared",
     "test:integration": "RUN_BROKER_INTEGRATION=1 vitest run apps/api/src/adapters/adapters.integration.test.ts apps/api/src/benchmark/benchmark-engine.integration.test.ts",
+    "test:e2e": "node scripts/e2e.mjs",
+    "test:e2e:browser": "playwright test",
+    "test:e2e:install": "playwright install chromium",
     "test:smoke": "node scripts/smoke.mjs",
     "test:watch": "vitest",
     "docker:config": "node scripts/compose.mjs config",
@@ -34,6 +37,7 @@
   },
   "devDependencies": {
     "@eslint/js": "9.33.0",
+    "@playwright/test": "1.55.0",
     "@types/node": "24.3.0",
     "concurrently": "9.2.4",
     "eslint": "9.33.0",

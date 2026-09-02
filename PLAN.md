@@ -247,7 +247,10 @@ Avoid a generic broker superclass. The adapters intentionally expose different d
 
 ### End-to-end tests
 
-Use a browser test for the critical path from suite creation to aggregate results. Cover reload during an active suite, SSE reconnection, cancellation, filtering, and export.
+Playwright covers the critical path from suite creation to aggregate results
+against an isolated Docker Compose stack. Extend the browser suite with reload
+during an active suite, SSE reconnection, cancellation, filtering, manual
+comparison, export, and mixed-track boundary checks.
 
 Performance assertions in CI should focus on correctness and broad sanity checks. Do not enforce narrow absolute throughput or latency thresholds on shared runners.
 

@@ -143,9 +143,13 @@ Read [benchmark methodology](docs/benchmark-methodology.md) before interpreting 
 | `npm test`                 | Run unit, API, and component tests                            |
 | `npm run build`            | Build TypeScript projects and the production dashboard bundle |
 | `npm run test:integration` | Exercise all broker adapters and scenarios against Docker     |
+| `npm run test:e2e`         | Run Playwright against an isolated Docker Compose stack       |
 | `npm run test:smoke`       | Build an isolated stack and complete a default persisted run  |
 
-The Docker-backed commands require a running Docker daemon. The smoke test uses isolated ports, project resources, and volumes, then removes everything it created.
+The Docker-backed commands require a running Docker daemon. The E2E and smoke
+tests use isolated ports, project resources, and volumes, then remove everything
+they create. Install the E2E Chromium binary once with
+`npm run test:e2e:install`.
 
 ## Documentation
 

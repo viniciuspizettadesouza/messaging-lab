@@ -87,3 +87,29 @@ verifies persisted history, and removes its resources:
 ```sh
 npm run test:smoke
 ```
+
+## Browser end-to-end tests
+
+Install Playwright's Chromium binary once:
+
+```sh
+npm run test:e2e:install
+```
+
+Then run the browser suite:
+
+```sh
+npm run test:e2e
+```
+
+The command builds and starts a dedicated Docker Compose project on isolated
+ports, runs Playwright against the production web container, and removes its
+containers and volumes afterward. The initial scenario creates a small real
+Redis suite and verifies the browser workflow through persisted aggregate
+results. Override the dedicated ports with `E2E_API_PORT`, `E2E_WEB_PORT`,
+`E2E_REDIS_PORT`, `E2E_KAFKA_PORT`, `E2E_RABBITMQ_PORT`, and
+`E2E_RABBITMQ_MANAGEMENT_PORT` when needed.
+
+When an E2E stack is already running, `npm run test:e2e:browser` runs only
+Playwright. Set `E2E_BASE_URL` if the dashboard is not available at
+`http://127.0.0.1:25173`.
