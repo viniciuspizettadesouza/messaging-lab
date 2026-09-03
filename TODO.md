@@ -168,18 +168,18 @@ The completed baseline records what was built under the original three-system co
 
 ## 21. Documentation and publication quality
 
-- [ ] Add `CONTRIBUTING.md` with setup, architecture boundaries, tests, and conventions.
-- [ ] Add `docs/experiment-recipes.md` with reproducible workloads and expected observations.
-- [ ] Add `docs/interpreting-results.md` covering medians, spread, outliers, and semantic limits.
-- [ ] Add `docs/troubleshooting.md` for Docker, ports, broker startup, SSE, and orphaned resources.
+- [x] Add `CONTRIBUTING.md` with setup, architecture boundaries, tests, and conventions.
+- [x] Add `docs/experiment-recipes.md` with reproducible workloads and expected observations.
+- [x] Add `docs/interpreting-results.md` covering medians, spread, outliers, and semantic limits.
+- [x] Add `docs/troubleshooting.md` for Docker, ports, broker startup, SSE, and orphaned resources.
 - [x] Add `docs/glossary.md` for messaging and benchmark terminology.
-- [ ] Add an ADR for serial execution and server-managed suites.
-- [ ] Cross-check the semantic comparison ADR from section 16 against all public documentation and screenshots.
-- [ ] Document database migrations, suite endpoints, events, and environment snapshots.
-- [ ] Update architecture and messaging-flow diagrams for suites and recovery experiments.
-- [ ] Refresh dashboard screenshots after the suite UI stabilizes.
-- [ ] Add a changelog or release-note process before publishing versioned releases.
-- [ ] Run the complete lint, format, type-check, unit, integration, E2E, build, and smoke suite from a clean checkout.
+- [x] Add an ADR for serial execution and server-managed suites.
+- [x] Cross-check the semantic comparison ADR from section 16 against all public documentation and screenshots.
+- [x] Document database migrations, suite endpoints, events, and environment snapshots.
+- [x] Update architecture and messaging-flow diagrams for suites and recovery experiments.
+- [x] Refresh dashboard screenshots after the suite UI stabilizes.
+- [x] Add a changelog or release-note process before publishing versioned releases.
+- [x] Run the complete lint, format, type-check, unit, integration, E2E, build, and smoke suite from a clean checkout.
 
 ## Later ideas — not currently scheduled
 

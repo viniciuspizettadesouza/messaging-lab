@@ -1,6 +1,6 @@
 # Messaging Lab
 
-Messaging Lab is a local-first dashboard for comparing how Redis, Kafka, and RabbitMQ implement live fan-out and competing-consumer messaging. It runs identical configurable workloads, streams progress in real time, and keeps each broker's delivery semantics visible beside the measurements.
+Messaging Lab is a local-first dashboard for exploring how Redis, Kafka, and RabbitMQ implement live fan-out and competing-consumer messaging. It runs configurable workloads, streams progress in real time, and keeps each broker's delivery semantics visible beside the measurements.
 
 This project is an educational lab, not a universal broker ranking. Results describe one workload, broker configuration, and host machine.
 
@@ -153,13 +153,19 @@ they create. Install the E2E Chromium binary once with
 
 ## Documentation
 
+- [Contributing guide](CONTRIBUTING.md)
+- [Experiment recipes](docs/experiment-recipes.md)
+- [Interpreting results](docs/interpreting-results.md)
+- [Troubleshooting](docs/troubleshooting.md)
 - [Local development](docs/local-development.md)
 - [Architecture and messaging flows](docs/architecture.md)
 - [Benchmark methodology and interpretation](docs/benchmark-methodology.md)
 - [Accessibility verification](docs/accessibility.md)
 - [Messaging glossary](docs/glossary.md)
 - [Semantic comparison tracks ADR](docs/adr/0001-semantic-comparison-tracks.md)
+- [Serial server-managed suites ADR](docs/adr/0002-serial-server-managed-suites.md)
 - [HTTP API and environment variables](docs/api.md)
+- [Changelog](CHANGELOG.md)
 
 ## License
 

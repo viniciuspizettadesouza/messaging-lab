@@ -1,6 +1,10 @@
 # Benchmark methodology
 
-Messaging Lab measures a deliberately small common baseline across Redis, Kafka, and RabbitMQ. It makes semantic differences explicit instead of treating unlike guarantees as equivalent.
+Messaging Lab applies deliberately controlled workload inputs to broker-native
+mechanisms. Kafka and RabbitMQ form the scenario-bound primary trade-off;
+Redis Streams and Redis Pub/Sub remain separate adjacent and ephemeral tracks.
+The lab makes semantic differences explicit instead of treating unlike
+guarantees as equivalent.
 
 ## Run sequence
 

@@ -122,6 +122,13 @@ Opens an SSE stream. Existing retained events are sent first, allowing a recentl
 
 The server sends comment heartbeats on long-lived streams. Nginx proxy buffering is disabled for `/api/` so events reach the dashboard immediately.
 
+Each data event uses its sequence as the SSE `id`, its discriminant as
+`event`, and the complete shared-contract object as JSON in `data`. Run event
+objects also include `runId` and an ISO timestamp. The process-local store
+retains the latest 500 events and sends its retained sequence to every new
+connection. Clients should ignore an already handled sequence after reconnect.
+The 15-second `: heartbeat` transport comments are not JSON domain events.
+
 ### `POST /api/suites`
 
 Validates, persists, and starts a server-managed suite. The complete execution
@@ -223,9 +230,59 @@ the current trial. In-memory history is replayed on reconnect; after an API
 restart the persisted progress, summary, and terminal state are synthesized.
 The stream closes when the suite reaches a terminal status.
 
+Suite data events carry the suite sequence as `id`, the event type as `event`,
+and JSON with `suiteId`, sequence, and timestamp. `run-event` contains the
+active trial's complete validated run event, including its separate run
+sequence. The suite store retains the latest 1,000 events in memory. A client
+must deduplicate suite sequences and nested run sequences independently.
+Transport heartbeats are 15-second SSE comments.
+
 If the API restarts during a suite, active runs are marked `failed` and the
 suite is marked `stopped`. Suites are not automatically resumed because host
 conditions may have changed.
+
+## Persistence and migrations
+
+SQLite is initialized before repositories and schedulers begin serving work.
+The API reads `PRAGMA user_version`, rejects a database newer than it supports,
+and applies each pending migration in its own `BEGIN IMMEDIATE` transaction.
+The schema statements and `user_version` advance commit together; a failure
+rolls both back and stops API startup.
+
+| Version | Stored capability                                                 |
+| ------: | ----------------------------------------------------------------- |
+|       1 | Runs, aggregate metrics, notes, and structured run errors         |
+|       2 | Suites, complete ordered suite-run membership, and suite errors   |
+|       3 | Immutable suite environment snapshots                             |
+|       4 | Run/suite descriptions, standalone run names, and history indexes |
+|       5 | Parameter-sweep point identity on ordered trials                  |
+|       6 | Consumer delay, ordering violations, and observed backlog metrics |
+
+Startup recovery marks persisted `pending` or `running` runs as failed and
+active suites as stopped with a reason. It never resumes queued suite positions
+automatically. Suite deletion cascades through ordered membership, suite
+errors, its environment snapshot, and owned runs; run deletion cascades through
+metrics, notes, and errors. See [architecture](architecture.md) for the table
+relationships and contributor migration rules.
+
+## Environment snapshots
+
+The snapshot is captured once when a suite is created and exported unchanged.
+It contains:
+
+- capture timestamp, Messaging Lab version, and optional source commit;
+- Node.js version;
+- OS platform, release, architecture, logical CPU count, and optional total
+  memory;
+- sanitized Redis, Kafka, and RabbitMQ image names plus versions inferred from
+  ordinary numeric image tags; and
+- non-secret adapter settings: transport and client library for each broker,
+  Kafka broker count, producer acknowledgements and topic-creation policy, and
+  RabbitMQ prefetch.
+
+Registry host prefixes are removed from image names. Hostname, username,
+filesystem paths, broker endpoints, and credentials are never captured. Legacy
+suites without a snapshot return `environment: null`.
 
 ## Error format
 

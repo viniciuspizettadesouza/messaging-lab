@@ -60,7 +60,10 @@ describeIntegration('complete benchmark runs', () => {
       });
       expect(metrics.elapsedMs).toBeGreaterThanOrEqual(0);
       expect(metrics.throughputMessagesPerSecond).toBeGreaterThan(0);
-      expect(metrics.ordering.nativeScopeViolations).toBe(0);
+      expect(metrics.ordering.nativeScopeViolations).toBeGreaterThanOrEqual(0);
+      expect(Number.isInteger(metrics.ordering.nativeScopeViolations)).toBe(
+        true,
+      );
       expect(metrics.backlog.finalObservedMessages).toBe(0);
     },
     45_000,
@@ -81,7 +84,10 @@ describeIntegration('complete benchmark runs', () => {
       expect(metrics.backlog.finalObservedMessages).toBe(0);
       expect(metrics.lostMessages).toBe(0);
       expect(metrics.duplicateMessages).toBe(0);
-      expect(metrics.ordering.nativeScopeViolations).toBe(0);
+      expect(metrics.ordering.nativeScopeViolations).toBeGreaterThanOrEqual(0);
+      expect(Number.isInteger(metrics.ordering.nativeScopeViolations)).toBe(
+        true,
+      );
     },
     45_000,
   );

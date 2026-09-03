@@ -4,6 +4,10 @@
 
 Messaging Lab has a complete local-first MVP. It can run live fan-out and competing-consumer workloads against Redis, Kafka, and RabbitMQ; stream progress; persist results in SQLite; and explain the semantic differences between the systems.
 
+The Phase 2 roadmap through documentation and publication quality is complete
+as of 2026-09-03. Remaining ideas are intentionally unscheduled and require
+separate safety, reproducibility, or product decisions.
+
 The next phase turns the project from a collection of individual benchmark runs into a reproducible experimentation environment. Its primary product-decision comparison is Kafka versus RabbitMQ. Redis remains in the lab as a separate adjacent-technology track: Redis Streams for focused stream-processing experiments and Redis Pub/Sub as an ephemeral live-delivery baseline. The priorities are repeatability, correctness, failure behavior, and clear interpretation—not producing a universal broker ranking.
 
 ## Product principles
