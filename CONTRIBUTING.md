@@ -31,9 +31,10 @@ npm run docker:up
 ```
 
 The dashboard is served at <http://localhost:5173> and the API at
-<http://localhost:3000>. See [local development](docs/local-development.md) for
-source-mode development, port overrides, logs, and browser-test setup. The
-credentials in `.env.example` are local development defaults only.
+<http://localhost:3000>. See the
+[technical reference](docs/reference.md#local-operation) for source-mode
+development, port overrides, logs, and browser-test setup. The credentials in
+`.env.example` are local development defaults only.
 
 ## Workspace responsibilities
 
@@ -68,7 +69,7 @@ inputs where useful, but keep unsupported behavior explicit. Recovery
 demonstrations must remain separate from performance rankings.
 
 Read [ADR 0001](docs/adr/0001-semantic-comparison-tracks.md) and the
-[benchmark methodology](docs/benchmark-methodology.md) before changing
+[experiment guide](docs/experiments.md) before changing
 adapters, result grouping, charts, exports, or explanatory copy.
 
 ### Keep execution server-owned and serial
@@ -203,16 +204,11 @@ Update documentation in the same change when behavior, contracts, setup, or
 interpretation changes:
 
 - `README.md` for user-visible capabilities and primary navigation.
-- `docs/api.md` for endpoints, filters, events, errors, environment variables,
-  and examples.
-- `docs/architecture.md` for ownership, lifecycle, persistence, and flow
-  changes.
-- `docs/benchmark-methodology.md` for metrics, workload rules, statistical
-  treatment, and interpretation limits.
-- `docs/glossary.md` for new messaging or benchmark terminology.
+- `docs/reference.md` for API, architecture, lifecycle, persistence, local
+  operation, troubleshooting, and accessibility changes.
+- `docs/experiments.md` for metrics, recipes, workload rules, terminology,
+  statistical treatment, and interpretation limits.
 - `docs/adr` for architectural decisions that constrain future work.
-- `docs/accessibility.md` when an interaction or verification procedure
-  changes.
 
 Examples must be reproducible and must not promise a broker ranking or a fixed
 performance result. Keep Kafka-versus-RabbitMQ comparisons scenario-bound,
@@ -220,9 +216,8 @@ Redis Streams independently summarized, Redis Pub/Sub explicitly ephemeral,
 and recovery/replay observations broker-native. Use official primary sources
 for claims about broker behavior.
 
-Update `TODO.md` only after the feature and its appropriate verification are
-complete. Keep `PLAN.md` focused on product direction rather than a log of
-implementation details.
+Update `ROADMAP.md` only when product status, boundaries, or future direction
+changes; it is not a log of implementation details.
 
 ## Pull request checklist
 

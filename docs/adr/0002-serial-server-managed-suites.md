@@ -81,3 +81,6 @@ Persisted order makes technical resumption possible, but a restart may also
 change application code, runtime, broker state, container allocation, or host
 load. Combining pre- and post-restart trials without an explicit boundary would
 produce a misleading suite, so interrupted suites stop with a recorded reason.
+
+The current execution and persistence flows are documented in the
+[technical reference](../reference.md#architecture).

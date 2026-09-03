@@ -66,7 +66,8 @@ Stop the stack without deleting persisted data:
 npm run docker:down
 ```
 
-See [local development](docs/local-development.md) for port overrides, logs, and source-based workflows.
+See the [technical reference](docs/reference.md#local-operation) for port
+overrides, logs, and source-based workflows.
 
 ## Architecture
 
@@ -100,7 +101,8 @@ The dashboard creates and observes server-managed suites through validated JSON
 and SSE contracts. Run and suite selections have stable URLs, and suite history
 groups every trial while leaving standalone runs visible.
 
-More detail and messaging-flow diagrams are in [architecture](docs/architecture.md).
+More detail and messaging-flow diagrams are in the
+[technical reference](docs/reference.md#architecture).
 
 ## Broker comparison
 
@@ -127,7 +129,9 @@ The default experiment publishes 10,000 deterministic 1 KiB payloads with one pr
 
 Latency uses monotonic timestamps in the API process, and at most 10,000 latency observations are retained in memory. Only aggregate metrics are persisted.
 
-Read [benchmark methodology](docs/benchmark-methodology.md) before interpreting results. It documents metric definitions, configuration limits, known limitations, and responsible comparison practices.
+Read the [experiment guide](docs/experiments.md) before interpreting results.
+It documents recipes, metric definitions, limits, and responsible comparison
+practices.
 
 ## Commands
 
@@ -154,17 +158,11 @@ they create. Install the E2E Chromium binary once with
 ## Documentation
 
 - [Contributing guide](CONTRIBUTING.md)
-- [Experiment recipes](docs/experiment-recipes.md)
-- [Interpreting results](docs/interpreting-results.md)
-- [Troubleshooting](docs/troubleshooting.md)
-- [Local development](docs/local-development.md)
-- [Architecture and messaging flows](docs/architecture.md)
-- [Benchmark methodology and interpretation](docs/benchmark-methodology.md)
-- [Accessibility verification](docs/accessibility.md)
-- [Messaging glossary](docs/glossary.md)
+- [Roadmap](ROADMAP.md)
+- [Experiment guide](docs/experiments.md)
+- [Technical reference](docs/reference.md)
 - [Semantic comparison tracks ADR](docs/adr/0001-semantic-comparison-tracks.md)
 - [Serial server-managed suites ADR](docs/adr/0002-serial-server-managed-suites.md)
-- [HTTP API and environment variables](docs/api.md)
 - [Changelog](CHANGELOG.md)
 
 ## License

@@ -71,3 +71,6 @@ does not match its broker/scenario classification.
 A future RabbitMQ Streams adapter is the prerequisite for a closer
 mechanism-level retained-stream comparison with Kafka. It would require a new
 track decision; the current queue adapter must not be treated as a retained log.
+
+Practical workload and interpretation guidance is consolidated in the
+[experiment guide](../experiments.md).
